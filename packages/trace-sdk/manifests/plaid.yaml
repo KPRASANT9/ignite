@@ -1,0 +1,167 @@
+system: plaid
+manifest_version: "0.1"
+description: >
+  Complete Plaid system exploration blueprint. Ordered by intelligence yield
+  per trace — what gives the Optimizer the most cross-trace patterns fastest.
+
+targets:
+  # === TIER 1: Highest Intelligence Yield (next 5 traces) ===
+
+  # Already completed
+  - id: M0-auth-docread
+    domain: auth
+    span_kind: doc_read
+    priority: P1
+    tier: 1
+    description: "Plaid Link auth flow — token lifecycle, OAuth, MFA"
+    endpoints: ["link/token/create", "item/public_token/exchange"]
+    expected_findings: ["auth", "state_machine", "protocol"]
+    status: completed
+    trace_id: trace-plaid-auth-001
+
+  - id: M1-transactions-apicall
+    domain: transactions
+    span_kind: api_call
+    priority: P1
+    tier: 1
+    description: "/transactions/sync cursor-based pagination — incremental sync FSM"
+    endpoints: ["transactions/sync"]
+    expected_findings: ["protocol", "state_machine", "data_format"]
+    status: completed
+    trace_id: trace-6781ded4acbf
+
+  - id: M2-errors-errorprobe
+    domain: errors
+    span_kind: error_probe
+    priority: P1
+    tier: 1
+    description: "Error injection — expired token, invalid params, ITEM_LOGIN_REQUIRED"
+    endpoints: ["transactions/get", "accounts/get", "item/get"]
+    expected_findings: ["error_pattern", "auth", "state_machine"]
+    status: completed
+    trace_id: trace-c0244ccbea8a
+
+  - id: M3-balance-apicall
+    domain: balance
+    span_kind: api_call
+    priority: P1
+    tier: 1
+    description: "/accounts/balance/get — real-time vs cached, staleness behavior"
+    endpoints: ["accounts/balance/get"]
+    expected_findings: ["protocol", "data_format"]
+    status: completed
+    trace_id: trace-349e3776c2e0
+
+  - id: M4-items-statetransition
+    domain: items
+    span_kind: state_transition
+    priority: P1
+    tier: 1
+    description: "Item lifecycle — force ITEM_LOGIN_REQUIRED, recovery via Link Update Mode"
+    endpoints: ["item/get", "sandbox/item/reset_login"]
+    expected_findings: ["state_machine", "error_pattern"]
+    status: completed
+    trace_id: trace-2b3e70cd6bad
+
+  - id: M5-webhooks-configinspect
+    domain: webhooks
+    span_kind: config_inspect
+    priority: P1
+    tier: 1
+    description: "Webhook delivery — fire + observe, event sequencing, retry behavior"
+    endpoints: ["sandbox/item/fire_webhook"]
+    expected_findings: ["protocol", "state_machine"]
+
+  # === TIER 2: Payments & Async Patterns (next 5 traces) ===
+
+  - id: M6-transfer-statetransition
+    domain: transfer
+    span_kind: state_transition
+    priority: P2
+    tier: 2
+    description: "ACH Transfer lifecycle — 7-state FSM (pending→posted→returned→failed→cancelled)"
+    endpoints: ["transfer/create", "transfer/get", "transfer/cancel"]
+    expected_findings: ["state_machine", "protocol"]
+
+  - id: M7-signal-apicall
+    domain: signal
+    span_kind: api_call
+    priority: P2
+    tier: 2
+    description: "Signal risk scoring — input features, score semantics, threshold behavior"
+    endpoints: ["signal/evaluate"]
+    expected_findings: ["data_format", "protocol"]
+
+  - id: M8-income-apicall
+    domain: income
+    span_kind: api_call
+    priority: P2
+    tier: 2
+    description: "Income/Assets async reports — polling patterns, report structure"
+    endpoints: ["income/verification/create", "statements/list", "statements/download"]
+    expected_findings: ["protocol", "data_format", "state_machine"]
+
+  - id: M9-identity-authflow
+    domain: identity
+    span_kind: auth_flow
+    priority: P2
+    tier: 2
+    description: "Identity verification flow — multi-step verification, match scoring"
+    endpoints: ["identity/get", "identity/match"]
+    expected_findings: ["auth", "data_format"]
+
+  - id: M10-ratelimit-errorprobe
+    domain: rate_limiting
+    span_kind: error_probe
+    priority: P2
+    tier: 2
+    description: "Rate limiting behavior — 100/min per Item, 1000-5000/min per client, backoff"
+    endpoints: ["transactions/get", "accounts/get"]
+    expected_findings: ["rate_limit", "error_pattern"]
+
+  # === TIER 3: Cross-Institution Variance (5 traces) ===
+
+  - id: M11-balance-chase
+    domain: balance_cross_institution
+    span_kind: api_call
+    priority: P3
+    tier: 3
+    description: "Balance behavior — Chase (ins_109508)"
+    endpoints: ["accounts/balance/get"]
+    expected_findings: ["data_format", "protocol"]
+
+  - id: M12-balance-creditunion
+    domain: balance_cross_institution
+    span_kind: api_call
+    priority: P3
+    tier: 3
+    description: "Balance behavior — First Gingham Credit Union (ins_109509)"
+    endpoints: ["accounts/balance/get"]
+    expected_findings: ["data_format", "protocol"]
+
+  - id: M13-transactions-chase
+    domain: transactions_cross_institution
+    span_kind: api_call
+    priority: P3
+    tier: 3
+    description: "Transaction sync — Chase (ins_109508)"
+    endpoints: ["transactions/sync"]
+    expected_findings: ["protocol", "data_format"]
+
+  - id: M14-transactions-creditunion
+    domain: transactions_cross_institution
+    span_kind: api_call
+    priority: P3
+    tier: 3
+    description: "Transaction sync — First Gingham Credit Union (ins_109509)"
+    endpoints: ["transactions/sync"]
+    expected_findings: ["protocol", "data_format"]
+
+  - id: M15-errors-crossinst
+    domain: errors_cross_institution
+    span_kind: error_probe
+    priority: P3
+    tier: 3
+    description: "Error behavior variance across sandbox institutions"
+    endpoints: ["transactions/get", "accounts/get"]
+    expected_findings: ["error_pattern"]
