@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ignite-parser"
+version = "0.1.0"
+description = "IGNITE L2 Parser + Analyzer — ingests trace JSONL from L1 agent swarms"
+requires-python = ">=3.11"
+
+[project.scripts]
+ignite-parse = "ignite_parser.cli:main"
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
