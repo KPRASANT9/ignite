@@ -1,0 +1,640 @@
+{
+  "schema_version": "0.1",
+  "trace_id": "trace-plaid-auth-001",
+  "agent_id": "PlaidExplorer",
+  "agent_role": "explorer",
+  "system": "plaid",
+  "study_channel": "6feefea7-c1b9-4814-86b5-24da4dd0644a",
+  "session_id": "session-2026-07-23-001",
+  "started_at": "2026-07-23T14:40:00Z",
+  "ended_at": "2026-07-23T14:53:00Z",
+  "status": "completed",
+  "objective": "Map the full Plaid authentication and authorization surface: Link token lifecycle, OAuth vs credential flows, MFA challenge types, Item state machine, and India AA equivalent patterns",
+  "findings_summary": "Plaid auth is a 3-stage token exchange (link_token \u2192 public_token \u2192 access_token) with institution-polymorphic backends (OAuth vs credential-based). Items have 5+ error states recoverable via Link Update Mode. 4 typed MFA challenge variants. India AA offers a structurally superior consent model (signed JSON artefacts, zero-knowledge relay) that IGNITE should adopt.",
+  "spans": [
+    {
+      "span_id": "span-token-lifecycle-001",
+      "trace_id": "trace-plaid-auth-001",
+      "sequence": 1,
+      "kind": "doc_read",
+      "started_at": "2026-07-23T14:40:00Z",
+      "ended_at": "2026-07-23T14:42:00Z",
+      "duration_ms": 120000,
+      "interaction": {
+        "target": "Plaid Link Overview docs + /link/token/create API reference",
+        "method": null,
+        "request": {
+          "url": "https://plaid.com/docs/link/",
+          "params": {}
+        },
+        "response": {
+          "body_summary": "Link initialization flow: /link/token/create generates link_token, passed to client. User authenticates in Link UI. onSuccess returns public_token. Exchange via /item/public_token/exchange for access_token + item_id."
+        }
+      },
+      "observation": {
+        "what_happened": "Read Plaid Link overview and /link/token/create API reference. Mapped the 3-stage token exchange: link_token (server-created, 4h TTL for new Items, 30m for update mode) \u2192 public_token (client-received via onSuccess, 30m TTL, single-use) \u2192 access_token (permanent, server-stored) + item_id.",
+        "what_learned": "The token architecture enforces a strict client-server boundary: ephemeral tokens on the client, durable tokens on the server. The public_token's 30-minute single-use constraint is a security measure \u2014 it can never be replayed. The link_token's shorter TTL in update mode (30m vs 4h) suggests update flows are expected to be immediate user actions, not deferred.",
+        "confidence": "high",
+        "surprises": "link_token supports 26 distinct product types and 20 country codes \u2014 the product surface is much wider than expected. Also supports 3 tiers of product specification: required, optional (best-effort), and required_if_supported.",
+        "questions_raised": [
+          "How does Plaid handle token rotation for long-lived access_tokens?",
+          "What is the failure mode when a public_token expires mid-exchange?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "client_id and secret configured",
+          "products selected"
+        ],
+        "postconditions": [
+          "link_token available for client initialization"
+        ],
+        "state_changes": [
+          "No Item exists yet \u2014 link_token is pre-auth"
+        ]
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [
+          "span-item-lifecycle-002",
+          "span-oauth-flow-003"
+        ],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "auth",
+        "token",
+        "link_token",
+        "public_token",
+        "access_token"
+      ],
+      "metadata": {
+        "source_urls": [
+          "https://plaid.com/docs/link/",
+          "https://plaid.com/docs/api/link/"
+        ],
+        "products_enum": [
+          "assets",
+          "auth",
+          "beacon",
+          "employment",
+          "identity",
+          "income_verification",
+          "identity_verification",
+          "investments",
+          "investments_auth",
+          "liabilities",
+          "payment_initiation",
+          "protect_transactions",
+          "standing_orders",
+          "signal",
+          "statements",
+          "transactions",
+          "transfer",
+          "cra_base_report",
+          "cra_income_insights",
+          "cra_cashflow_insights",
+          "cra_lend_score",
+          "cra_partner_insights",
+          "cra_network_insights",
+          "cra_monitoring",
+          "layer",
+          "protect_linked_bank"
+        ],
+        "country_codes": [
+          "US",
+          "GB",
+          "ES",
+          "NL",
+          "FR",
+          "IE",
+          "CA",
+          "DE",
+          "IT",
+          "PL",
+          "DK",
+          "NO",
+          "SE",
+          "EE",
+          "LT",
+          "LV",
+          "PT",
+          "BE",
+          "AT",
+          "FI"
+        ]
+      },
+      "parent_span_id": null
+    },
+    {
+      "span_id": "span-item-lifecycle-002",
+      "trace_id": "trace-plaid-auth-001",
+      "sequence": 2,
+      "kind": "state_transition",
+      "started_at": "2026-07-23T14:42:00Z",
+      "ended_at": "2026-07-23T14:44:00Z",
+      "duration_ms": 120000,
+      "interaction": {
+        "target": "Plaid Items API reference \u2014 /item/get, /item/remove, /item/public_token/exchange, /item/access_token/invalidate",
+        "method": null,
+        "request": {
+          "url": "https://plaid.com/docs/api/items/"
+        },
+        "response": {
+          "body_summary": "Item lifecycle: HEALTHY \u2192 error states (ITEM_LOGIN_REQUIRED, OAUTH_INVALID_TOKEN, OAUTH_CONSENT_EXPIRED, OAUTH_USER_REVOKED, PENDING_DISCONNECT, PENDING_EXPIRATION) \u2192 recovery via Link Update Mode. 8 webhook event types. /item/get returns status, products, consent info, webhook history."
+        }
+      },
+      "observation": {
+        "what_happened": "Mapped complete Item state machine from Plaid Items API docs. Identified 5+ error states, 8 webhook event types, recovery paths via Link Update Mode, and token rotation via /item/access_token/invalidate.",
+        "what_learned": "Items are the central persistence unit \u2014 they track not just auth state but also product subscriptions, billing, and consent metadata. The error taxonomy splits into credential errors (ITEM_LOGIN_REQUIRED), OAuth errors (3 subtypes: invalid token, expired consent, user revoked), and scheduled disconnection (PENDING_DISCONNECT for US/CA, PENDING_EXPIRATION for UK/EU with 7-day advance warning). LOGIN_REPAIRED is an interesting external recovery event \u2014 the Item self-heals without app intervention.",
+        "confidence": "high",
+        "surprises": "Items track 7 auth population methods (INSTANT_AUTH, INSTANT_MATCH, 3 micro-deposit variants, DATABASE_MATCH, DATABASE_INSIGHTS) \u2014 revealing Plaid's fallback chain. Also: /item/remove accepts a fraud reason enum (FRAUD_FIRST_PARTY, FRAUD_FALSE_IDENTITY, etc.), indicating Plaid uses removal signals for risk modeling.",
+        "questions_raised": [
+          "What triggers LOGIN_REPAIRED \u2014 does the bank push a credential refresh?",
+          "How does PENDING_DISCONNECT timing interact with consent_expiration_time?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "access_token obtained via token exchange"
+        ],
+        "postconditions": [
+          "Item state machine fully mapped with all transitions"
+        ],
+        "state_changes": [
+          "HEALTHY \u2192 ERROR \u2192 UPDATE_MODE \u2192 HEALTHY (recovery cycle)",
+          "HEALTHY \u2192 REMOVED (terminal)"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-token-lifecycle-001"
+        ],
+        "enables": [
+          "span-oauth-flow-003"
+        ],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "state_machine",
+        "item",
+        "webhook",
+        "error_states",
+        "recovery"
+      ],
+      "metadata": {
+        "webhook_types": [
+          "ERROR",
+          "LOGIN_REPAIRED",
+          "NEW_ACCOUNTS_AVAILABLE",
+          "PENDING_DISCONNECT",
+          "PENDING_EXPIRATION",
+          "USER_PERMISSION_REVOKED",
+          "USER_ACCOUNT_REVOKED",
+          "WEBHOOK_UPDATE_ACKNOWLEDGED"
+        ],
+        "auth_methods": [
+          "INSTANT_AUTH",
+          "INSTANT_MATCH",
+          "INSTANT_MICRODEPOSITS",
+          "AUTOMATED_MICRODEPOSITS",
+          "SAME_DAY_MICRODEPOSITS",
+          "DATABASE_MATCH",
+          "DATABASE_INSIGHTS"
+        ]
+      },
+      "parent_span_id": null
+    },
+    {
+      "span_id": "span-oauth-flow-003",
+      "trace_id": "trace-plaid-auth-001",
+      "sequence": 3,
+      "kind": "auth_flow",
+      "started_at": "2026-07-23T14:44:00Z",
+      "ended_at": "2026-07-23T14:47:00Z",
+      "duration_ms": 180000,
+      "interaction": {
+        "target": "Plaid OAuth Guide \u2014 redirect flows, institution-specific behaviors, consent management",
+        "method": null,
+        "request": {
+          "url": "https://plaid.com/docs/link/oauth/"
+        },
+        "response": {
+          "body_summary": "OAuth mandatory for EU/UK, adopted by major US banks. Flow: Link \u2192 bank OAuth portal \u2192 redirect_uri \u2192 Link reinitialization. Institution-specific: Chase tokenizes account numbers and invalidates old Items; BofA migrating 2026; Capital One yearly refresh; Schwab 6-week approval. Consent expiration varies: 180d EU, 12mo US, 3mo Brex, 18mo USAA."
+        }
+      },
+      "observation": {
+        "what_happened": "Read complete Plaid OAuth guide. Mapped OAuth vs credential-based auth differences, institution-specific quirks for 6 major banks, consent expiration schedules for 12 institutions/regions, redirect URI requirements per platform, and App-to-App flow for Chase/Chime.",
+        "what_learned": "OAuth is not a uniform standard across institutions \u2014 each bank adds its own constraints. Chase's Item invalidation on new OAuth with different account sets is a critical edge case for any multi-account integration. BofA's ongoing 2026 migration means the credential\u2192OAuth transition is still actively happening. The consent expiration landscape is fragmented: 3 months (Brex) to 18 months (USAA), with EU at 180 days. App-to-App (biometric auth via bank's native app) is limited to Chase and Chime \u2014 a premium UX path.",
+        "confidence": "high",
+        "surprises": "Charles Schwab can take up to 6 weeks for Production approval and only allows one active OAuth Item per user/application \u2014 this is the most restrictive institution documented. QR code authentication is available for European institutions (desktop-to-mobile bridge).",
+        "questions_raised": [
+          "How do apps handle the BofA credential\u2192OAuth migration mid-flight?",
+          "What percentage of US institutions now use OAuth vs credential-based?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "redirect_uri registered in Plaid Dashboard",
+          "Production access approved"
+        ],
+        "postconditions": [
+          "OAuth flow documented with all institution-specific variants"
+        ],
+        "state_changes": [
+          "User authenticated at bank \u2192 public_token returned via redirect"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-token-lifecycle-001"
+        ],
+        "enables": [
+          "span-mfa-types-004"
+        ],
+        "contradicts": [],
+        "refines": [
+          "span-item-lifecycle-002"
+        ]
+      },
+      "tags": [
+        "oauth",
+        "redirect",
+        "consent",
+        "institution_specific",
+        "app_to_app"
+      ],
+      "metadata": {
+        "oauth_institutions_documented": [
+          "Chase",
+          "Bank of America",
+          "Capital One",
+          "Charles Schwab",
+          "PNC",
+          "US Bank",
+          "Robinhood"
+        ],
+        "consent_expiration_schedule": {
+          "EU/UK": "180 days",
+          "American Express": "12 months",
+          "Bank of America": "12 months",
+          "Brex": "3 months",
+          "Capital One": "12 months",
+          "Charles Schwab": "12 months",
+          "Citibank": "12 months",
+          "Fidelity": "12 months",
+          "Navy Federal": "12 months",
+          "PNC": "12 months",
+          "TD Bank": "12 months",
+          "USAA": "18 months"
+        }
+      },
+      "parent_span_id": null
+    },
+    {
+      "span_id": "span-mfa-types-004",
+      "trace_id": "trace-plaid-auth-001",
+      "sequence": 4,
+      "kind": "auth_flow",
+      "started_at": "2026-07-23T14:47:00Z",
+      "ended_at": "2026-07-23T14:49:00Z",
+      "duration_ms": 120000,
+      "interaction": {
+        "target": "Plaid Sandbox test credentials \u2014 MFA challenge types and response formats",
+        "method": null,
+        "request": {
+          "url": "https://plaid.com/docs/sandbox/test-credentials/"
+        },
+        "response": {
+          "body_summary": "4 MFA types: Device OTP (code 1234), Security Questions (N rounds \u00d7 M questions, answer_i_j format), Single Selection (Yes), Multiple Selections (N\u00d7M\u00d7O, answer_r_q_o format). Templated password format drives challenge configuration."
+        }
+      },
+      "observation": {
+        "what_happened": "Mapped all 4 MFA challenge types from Plaid Sandbox documentation: Device OTP, Security Questions, Single Selection, Multiple Selections. Each has a structured challenge format and a deterministic response format. The Sandbox uses templated passwords to control MFA flow configuration.",
+        "what_learned": "MFA in Plaid is a typed union with 4 variants \u2014 this is a clean abstraction that IGNITE can directly adopt. The challenge-response patterns are fully parameterized: the number of rounds, questions per round, and options per question are all configurable via the password template. The response format uses positional indexing (answer_round_question_option) rather than semantic keys. Bank of America and US Bank cannot be used as test institutions for MFA flows \u2014 suggesting their real MFA implementations differ enough from the sandbox model.",
+        "confidence": "high",
+        "surprises": "The MFA system is more structured than expected \u2014 it's not just 'enter a code'. The multi-round, multi-question, multi-option selection type suggests some institutions have complex interactive verification flows.",
+        "questions_raised": [
+          "Do any institutions use MFA types not covered by these 4 categories?",
+          "How does MFA interact with OAuth flows \u2014 does OAuth eliminate MFA from Plaid's perspective?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "User has entered credentials in Link UI"
+        ],
+        "postconditions": [
+          "MFA challenge taxonomy fully mapped"
+        ],
+        "state_changes": [
+          "MFA challenge presented \u2192 user responds \u2192 auth completes or fails"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-oauth-flow-003"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "mfa",
+        "challenge_types",
+        "sandbox",
+        "typed_union"
+      ],
+      "metadata": {
+        "mfa_types": {
+          "device_otp": {
+            "test_password": "mfa_device",
+            "test_code": "1234"
+          },
+          "security_questions": {
+            "test_password_format": "mfa_questions_<n>_<m>",
+            "response_format": "answer_<i>_<j>"
+          },
+          "single_selection": {
+            "test_password": "mfa_selections",
+            "response": "Yes"
+          },
+          "multiple_selections": {
+            "test_password_format": "mfa_selections_<n>_<m>_<o>",
+            "response_format": "answer_<r>_<q>_<o>"
+          }
+        },
+        "link_events": [
+          "SUBMIT_MFA",
+          "SUBMIT_CREDENTIALS",
+          "OPEN_OAUTH",
+          "CLOSE_OAUTH",
+          "FAIL_OAUTH"
+        ]
+      },
+      "parent_span_id": null
+    },
+    {
+      "span_id": "span-india-aa-005",
+      "trace_id": "trace-plaid-auth-001",
+      "sequence": 5,
+      "kind": "doc_read",
+      "started_at": "2026-07-23T14:49:00Z",
+      "ended_at": "2026-07-23T14:53:00Z",
+      "duration_ms": 240000,
+      "interaction": {
+        "target": "India Account Aggregator framework \u2014 ReBIT spec, Setu FIP APIs, Sahamati technical architecture",
+        "method": null,
+        "request": {
+          "url": "https://docs.setu.co/data/account-aggregator/api-integration/fip-apis"
+        },
+        "response": {
+          "body_summary": "AA framework: RBI-regulated consent managers (Finvu, OneMoney, Anumati, NADL, CAMSFinserv). Consent Artefact is a signed JSON with purpose, fiTypes, frequency, dataLife. Data flow: FIU\u2192AA\u2192User consent\u2192FIP encrypts with FIU public key\u2192AA relays (cannot decrypt)\u2192FIU decrypts. APIs: /Accounts/discover, /Accounts/link, /Consent, /FI/request, /FI/fetch, /Notification, /Heartbeat."
+        }
+      },
+      "observation": {
+        "what_happened": "Researched India's Account Aggregator framework as the structural equivalent to Plaid for the Indian market. Mapped the FIP/FIU/AA entity model, consent artefact schema, data flow with end-to-end encryption, key AA operators, and the ReBIT API specification endpoints. Also captured Setu's FIP health metrics system.",
+        "what_learned": "The India AA framework is architecturally more sophisticated than Plaid in two critical ways: (1) the AA intermediary is zero-knowledge \u2014 it routes encrypted data but cannot read it, unlike Plaid which processes data in cleartext; (2) consent is a first-class signed data structure with explicit purpose, duration, frequency, and data-life fields, not an implicit side-effect of a UI flow. The health-aware routing via Setu (real-time FIP success rates, latency percentiles) is a production pattern Plaid doesn't expose publicly. These represent IGNITE's highest-value transferable patterns from this trace.",
+        "confidence": "high",
+        "surprises": "The consent artefact includes a 'dataLife' field (how long the FIU can retain data after fetch) \u2014 this is a GDPR-style data retention constraint baked into the protocol layer. Plaid has no equivalent. Also, Setu's 10-minute FIP health refresh cycle suggests significant FIP reliability variance.",
+        "questions_raised": [
+          "Can the AA consent artefact model be generalized to non-Indian financial institutions?",
+          "What is the actual FIP success rate distribution across Indian banks?",
+          "How does the AA framework handle FIP downtime during an active consent?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "Understanding of Plaid auth model for comparison baseline"
+        ],
+        "postconditions": [
+          "Plaid \u2194 India AA structural mapping complete"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [
+          "span-token-lifecycle-001",
+          "span-oauth-flow-003"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "india_aa",
+        "consent_artefact",
+        "zero_knowledge",
+        "fip",
+        "fiu",
+        "encrypted_relay"
+      ],
+      "metadata": {
+        "aa_operators": [
+          "Finvu",
+          "OneMoney",
+          "Anumati",
+          "NADL",
+          "CAMSFinserv"
+        ],
+        "tsp": [
+          "Setu (Pine Labs)"
+        ],
+        "api_endpoints": [
+          "/Accounts/discover",
+          "/Accounts/link",
+          "/Consent",
+          "/Consent/{id}",
+          "/FI/request",
+          "/FI/fetch/{sessionId}",
+          "/Notification",
+          "/Heartbeat"
+        ],
+        "consent_artefact_fields": [
+          "consentId",
+          "purpose",
+          "fiTypes",
+          "consentStart",
+          "consentExpiry",
+          "fetchType",
+          "frequency",
+          "dataLife",
+          "fipId",
+          "fiuId",
+          "aaId",
+          "digitalSignature"
+        ]
+      },
+      "parent_span_id": null
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-auth-001",
+      "trace_id": "trace-plaid-auth-001",
+      "source_spans": [
+        "span-token-lifecycle-001",
+        "span-item-lifecycle-002"
+      ],
+      "category": "auth",
+      "title": "Plaid uses a 3-stage ephemeral-to-persistent token exchange with strict client-server boundary",
+      "description": "The auth flow is link_token (server, 4h/30m TTL) \u2192 public_token (client, 30m single-use) \u2192 access_token (server, permanent). This pattern enforces that secrets never persist on the client and ephemeral tokens cannot be replayed. The access_token can be rotated via /item/access_token/invalidate without re-authenticating the user. IGNITE should model this as a generic multi-stage token exchange state machine with configurable TTLs and usage constraints per stage.",
+      "evidence": [
+        "span-token-lifecycle-001",
+        "span-item-lifecycle-002"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [
+        "finding-auth-002"
+      ],
+      "tags": [
+        "token_exchange",
+        "security",
+        "state_machine"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-auth-002",
+      "trace_id": "trace-plaid-auth-001",
+      "source_spans": [
+        "span-item-lifecycle-002"
+      ],
+      "category": "state_machine",
+      "title": "Item lifecycle has 5+ error states with a unified recovery path via Link Update Mode",
+      "description": "Items transition from HEALTHY to error states (ITEM_LOGIN_REQUIRED, OAUTH_INVALID_TOKEN, OAUTH_CONSENT_EXPIRED, OAUTH_USER_REVOKED) or scheduled disconnection (PENDING_DISCONNECT/EXPIRATION with 7-day advance warning). All error states converge on Link Update Mode for recovery. LOGIN_REPAIRED is a unique external recovery event. 8 webhook types provide async state change notifications. IGNITE should model financial connection state as a finite state machine with typed error categories and webhook-driven transitions.",
+      "evidence": [
+        "span-item-lifecycle-002"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [
+        "finding-auth-001",
+        "finding-auth-003"
+      ],
+      "tags": [
+        "state_machine",
+        "error_handling",
+        "webhook",
+        "recovery"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-auth-003",
+      "trace_id": "trace-plaid-auth-001",
+      "source_spans": [
+        "span-oauth-flow-003"
+      ],
+      "category": "auth",
+      "title": "OAuth consent expiration is fragmented: 3 months (Brex) to 18 months (USAA), requiring per-institution refresh strategies",
+      "description": "Each OAuth institution sets its own consent duration: EU/UK at 180 days, most US banks at 12 months, with outliers at 3 months (Brex) and 18 months (USAA). Chase invalidates old Items when new OAuth creates different account sets. BofA is actively migrating from credential to OAuth throughout 2026. Charles Schwab limits to 1 active Item per user/app with 6-week approval. IGNITE must treat consent expiration as a per-institution parameter, not a global constant, and implement proactive renewal workflows triggered by PENDING_DISCONNECT/EXPIRATION webhooks.",
+      "evidence": [
+        "span-oauth-flow-003"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [
+        "finding-auth-002"
+      ],
+      "tags": [
+        "oauth",
+        "consent",
+        "institution_specific",
+        "fragmentation"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-auth-004",
+      "trace_id": "trace-plaid-auth-001",
+      "source_spans": [
+        "span-mfa-types-004"
+      ],
+      "category": "auth",
+      "title": "MFA is a typed union of 4 challenge variants with structured response formats",
+      "description": "Plaid abstracts institution-specific MFA into 4 typed challenges: Device OTP (code delivery), Security Questions (N rounds \u00d7 M questions), Single Selection (binary choice), Multiple Selections (N rounds \u00d7 M questions \u00d7 O options). Responses follow positional indexing (answer_round_question_option). OAuth flows delegate MFA to the bank entirely, removing it from Plaid's abstraction layer. IGNITE should model MFA as a discriminated union type with per-variant response schemas.",
+      "evidence": [
+        "span-mfa-types-004"
+      ],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [
+        "mfa",
+        "typed_union",
+        "challenge_response"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-auth-005",
+      "trace_id": "trace-plaid-auth-001",
+      "source_spans": [
+        "span-india-aa-005"
+      ],
+      "category": "protocol",
+      "title": "India AA's zero-knowledge relay and signed consent artefact are structurally superior patterns IGNITE should adopt",
+      "description": "Unlike Plaid (which processes data in cleartext), India's AA framework enforces that the intermediary cannot decrypt data \u2014 FIPs encrypt with FIU's public key, AA relays opaque payloads. Consent is a digitally signed JSON artefact with explicit purpose, data types, duration, frequency, and data-life (retention limit). This is architecturally more robust than Plaid's implicit consent model. The 'dataLife' field (post-fetch retention constraint) has no Plaid equivalent and anticipates GDPR-style regulation. IGNITE should implement consent-as-data-structure and encrypted relay as foundational patterns, not afterthoughts.",
+      "evidence": [
+        "span-india-aa-005"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [
+        "finding-auth-001",
+        "finding-auth-003"
+      ],
+      "tags": [
+        "india_aa",
+        "zero_knowledge",
+        "consent_artefact",
+        "encryption",
+        "transferable_pattern"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-auth-006",
+      "trace_id": "trace-plaid-auth-001",
+      "source_spans": [
+        "span-india-aa-005"
+      ],
+      "category": "undocumented",
+      "title": "Health-aware FIP routing with real-time metrics is a production pattern Plaid doesn't expose",
+      "description": "Setu's FIP health API provides real-time success rates (consent conversion, data fetch), per-AA breakdowns, and latency percentiles (P50/P95/P99) with 10-minute refresh cycles. FIPs are dynamically activated/deactivated based on performance. Plaid does not expose equivalent institution health metrics to developers. IGNITE should implement health-aware connector routing as a first-class concern, dynamically steering traffic away from degraded institutions.",
+      "evidence": [
+        "span-india-aa-005"
+      ],
+      "confidence": "probable",
+      "actionability": "needs_validation",
+      "related_findings": [
+        "finding-auth-005"
+      ],
+      "tags": [
+        "health_routing",
+        "observability",
+        "india_aa",
+        "setu"
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "source_files": [
+      "RESEARCH/PLAID_AUTH_TRACE.md"
+    ],
+    "total_spans": 5,
+    "total_findings": 6,
+    "documentation_sources": [
+      "https://plaid.com/docs/link/",
+      "https://plaid.com/docs/api/link/",
+      "https://plaid.com/docs/api/items/",
+      "https://plaid.com/docs/link/oauth/",
+      "https://plaid.com/docs/sandbox/test-credentials/",
+      "https://docs.setu.co/data/account-aggregator/api-integration/fip-apis"
+    ]
+  }
+}

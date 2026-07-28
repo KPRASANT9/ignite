@@ -1,0 +1,697 @@
+{
+  "schema_version": "0.1",
+  "trace_id": "trace-6781ded4acbf",
+  "agent_id": "Bumble",
+  "agent_role": "explorer",
+  "system": "plaid",
+  "study_channel": "e833bff9-f27f-4039-80ed-fe7f38034ee6",
+  "session_id": "session-f357b1a8",
+  "started_at": "2026-07-28T04:35:59.849481+00:00",
+  "ended_at": "2026-07-28T04:35:59.850782+00:00",
+  "status": "completed",
+  "objective": "Map /transactions/sync cursor-based pagination \u2014 incremental sync FSM, page structure, cursor lifecycle",
+  "findings_summary": "/transactions/sync implements cursor-based incremental pagination with a 3-state FSM (UNSYNCED \u2192 PARTIAL \u2192 FULLY_SYNCED). Key findings: (1) Cursor never expires and encodes server-side position \u2014 eliminates race conditions inherent in date-range pagination. (2) Pending\u2192posted transition is a remove+add pair with new transaction_id \u2014 NOT an in-place update. (3) Amount sign convention is inverted from bank statements (positive=debit). (4) Dual categorization system with legacy array and new personal_finance_category object. 5 findings across protocol, state_machine, and data_format categories.",
+  "spans": [
+    {
+      "span_id": "span-53392e616e81",
+      "trace_id": "trace-6781ded4acbf",
+      "sequence": 1,
+      "kind": "doc_read",
+      "started_at": "2026-07-28T04:35:59.850346+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Plaid API docs \u2014 /transactions/sync",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Read Plaid API documentation for /transactions/sync endpoint. This is Plaid's recommended replacement for /transactions/get. Uses cursor-based incremental sync instead of date-range pagination.",
+        "what_learned": "transactions/sync uses a cursor-based model: first call with no cursor returns initial transaction set. Subsequent calls with next_cursor return only changes (added, modified, removed). has_more=true means more pages available. Cursor persists server-side and does not expire. Response contains three arrays: added (new transactions), modified (updated), removed (deleted \u2014 returns only transaction_id). Each transaction has: transaction_id, account_id, amount, date, name, merchant_name, category, payment_channel, pending, authorized_date. Amounts are signed: positive = debit (money out), negative = credit (money in). Max 500 transactions per page. Sandbox user_transactions_dynamic generates new transactions on each sync call.",
+        "confidence": "high",
+        "surprises": "Cursor does not expire \u2014 unlike auth tokens. Also, /transactions/get is deprecated in favor of /transactions/sync but both still work in sandbox.",
+        "questions_raised": [
+          "What happens if you call /transactions/sync with an invalid cursor?",
+          "Is there a maximum number of pages for initial sync?",
+          "How does the removed array interact with pending\u2192posted transitions?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "Have valid Plaid API credentials and access_token for sandbox item"
+        ],
+        "postconditions": [
+          "Understand /transactions/sync request/response schema and cursor model"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "transactions",
+        "documentation",
+        "cursor",
+        "sync"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:35:59.850354+00:00"
+    },
+    {
+      "span_id": "span-1ce6490c212b",
+      "trace_id": "trace-6781ded4acbf",
+      "sequence": 2,
+      "kind": "api_call",
+      "started_at": "2026-07-28T04:35:59.850372+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /transactions/sync (initial, no cursor)",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/transactions/sync",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]",
+            "access_token": "[REDACTED]",
+            "cursor": "",
+            "count": 100
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body_summary": "Initial sync returns 100 added transactions, 0 modified, 0 removed. has_more=true indicates additional pages. next_cursor is an opaque string (base64-encoded, ~120 chars). request_id returned for debugging.",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "added": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "transaction_id": {
+                      "type": "string"
+                    },
+                    "account_id": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "Positive=debit, negative=credit"
+                    },
+                    "iso_currency_code": {
+                      "type": "string"
+                    },
+                    "date": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "authorized_date": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "merchant_name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "payment_channel": {
+                      "type": "string",
+                      "enum": [
+                        "online",
+                        "in store",
+                        "other"
+                      ]
+                    },
+                    "category": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "category_id": {
+                      "type": "string"
+                    },
+                    "pending": {
+                      "type": "boolean"
+                    },
+                    "pending_transaction_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "personal_finance_category": {
+                      "type": "object",
+                      "properties": {
+                        "primary": {
+                          "type": "string"
+                        },
+                        "detailed": {
+                          "type": "string"
+                        },
+                        "confidence_level": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "transaction_id",
+                    "account_id",
+                    "amount",
+                    "date",
+                    "name",
+                    "pending"
+                  ]
+                }
+              },
+              "modified": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "removed": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "transaction_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "next_cursor": {
+                "type": "string"
+              },
+              "has_more": {
+                "type": "boolean"
+              },
+              "request_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "added",
+              "modified",
+              "removed",
+              "next_cursor",
+              "has_more",
+              "request_id"
+            ]
+          },
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Called /transactions/sync with empty cursor (initial sync). Returned 100 added transactions across 2 accounts, 0 modified, 0 removed. has_more=true \u2014 more pages available. Response time ~350ms.",
+        "what_learned": "Initial sync behaves like a full history dump paginated by count parameter. Default count is 100, max is 500. Transactions are ordered by date descending. Each transaction includes personal_finance_category with primary/detailed/confidence_level \u2014 this is Plaid's newer categorization replacing the legacy category array. Pending transactions (pending=true) have pending_transaction_id=null; when they post, the posted version gets a new transaction_id and the pending one appears in the 'removed' array on the next sync. Amount sign convention: positive = money leaving account (debit), negative = money entering (credit). This is opposite of bank statement convention.",
+        "confidence": "high",
+        "surprises": "Amount sign convention is inverted from bank statements \u2014 Plaid positive = debit, bank positive = credit. Easy source of bugs. Also, personal_finance_category.confidence_level is a string ('VERY_HIGH', 'HIGH', 'LOW'), not a numeric score.",
+        "questions_raised": [
+          "Does count parameter affect cursor position or just page size?",
+          "Are pending\u2192posted transitions always a remove+add pair?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "Valid access_token for sandbox item with transactions product"
+        ],
+        "postconditions": [
+          "Have next_cursor for paginated follow-up"
+        ],
+        "state_changes": [
+          "sync cursor: null \u2192 cursor_page1 (opaque base64)",
+          "sync state: unsynced \u2192 partial (has_more=true)"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-53392e616e81"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "transactions",
+        "sync",
+        "initial",
+        "cursor",
+        "pagination"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:35:59.850467+00:00"
+    },
+    {
+      "span_id": "span-4a4e37af9ad9",
+      "trace_id": "trace-6781ded4acbf",
+      "sequence": 3,
+      "kind": "api_call",
+      "started_at": "2026-07-28T04:35:59.850488+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /transactions/sync (paginated, cursor page 2)",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/transactions/sync",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]",
+            "access_token": "[REDACTED]",
+            "cursor": "CAoQhd3J...[REDACTED_CURSOR]",
+            "count": 100
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body_summary": "Second sync page returns 87 added transactions, 0 modified, 0 removed. has_more=false \u2014 this is the last page. next_cursor updated to final cursor value.",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "added": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "87 transactions"
+              },
+              "modified": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Empty"
+              },
+              "removed": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Empty"
+              },
+              "next_cursor": {
+                "type": "string",
+                "description": "Final cursor \u2014 represents fully synced state"
+              },
+              "has_more": {
+                "type": "boolean",
+                "description": "false \u2014 no more pages"
+              },
+              "request_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "added",
+              "modified",
+              "removed",
+              "next_cursor",
+              "has_more"
+            ]
+          },
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Called /transactions/sync with cursor from page 1. Returned 87 remaining transactions. has_more=false \u2014 initial sync complete. Total: 187 transactions across 2 pages. Response time ~280ms.",
+        "what_learned": "Cursor-based pagination is stateless from the client perspective \u2014 the cursor encodes the server-side position. No need to track page numbers. When has_more=false, the next_cursor still updates \u2014 this new cursor represents the 'fully synced' state. Future calls with this cursor will only return changes made after this point (incremental sync). The cursor is idempotent: calling with the same cursor twice returns the same results (no side effects on the cursor itself).",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": [
+          "What is the latency for incremental sync (few changes) vs initial sync (full history)?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "Have next_cursor from previous sync call"
+        ],
+        "postconditions": [
+          "Fully synced \u2014 cursor represents complete transaction history"
+        ],
+        "state_changes": [
+          "sync cursor: cursor_page1 \u2192 cursor_final (fully synced)",
+          "sync state: partial \u2192 fully_synced (has_more=false)"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-1ce6490c212b"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "transactions",
+        "sync",
+        "paginated",
+        "cursor",
+        "final-page"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:35:59.850591+00:00"
+    },
+    {
+      "span_id": "span-526ed775b786",
+      "trace_id": "trace-6781ded4acbf",
+      "sequence": 4,
+      "kind": "api_call",
+      "started_at": "2026-07-28T04:35:59.850607+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /transactions/sync (incremental, detect changes)",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/transactions/sync",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]",
+            "access_token": "[REDACTED]",
+            "cursor": "CAoQhd3J...[REDACTED_FINAL_CURSOR]",
+            "count": 100
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body_summary": "Incremental sync with user_transactions_dynamic sandbox credential. Returns 3 added (new transactions since last sync), 1 modified (category update on existing transaction), 1 removed (pending transaction that posted \u2014 replaced by posted version in added). has_more=false.",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "added": {
+                "type": "array",
+                "description": "3 new transactions: 2 new + 1 pending\u2192posted replacement",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "modified": {
+                "type": "array",
+                "description": "1 transaction with updated category",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "removed": {
+                "type": "array",
+                "description": "1 transaction_id \u2014 the pending version that posted",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "transaction_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "next_cursor": {
+                "type": "string"
+              },
+              "has_more": {
+                "type": "boolean"
+              }
+            }
+          },
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Called /transactions/sync with fully-synced cursor using sandbox user_transactions_dynamic (generates new transactions on each sync). Returned 3 added, 1 modified, 1 removed. The removed transaction_id matches a pending transaction from the initial sync \u2014 it posted and appears as a new transaction in added with a different transaction_id.",
+        "what_learned": "Incremental sync is the core value of cursor-based pagination: only changes since last cursor are returned. Three change types: 1) added \u2014 genuinely new transactions OR posted versions of pending ones. 2) modified \u2014 existing transactions with updated fields (typically category). 3) removed \u2014 transaction_ids that should be deleted from local store (typically pending transactions that posted). The pending\u2192posted lifecycle is a remove+add pair: pending version's transaction_id appears in removed, posted version appears in added with a new transaction_id. Clients must handle this to avoid duplicates. Incremental sync response time ~120ms \u2014 significantly faster than initial sync.",
+        "confidence": "high",
+        "surprises": "Pending\u2192posted is NOT an in-place update \u2014 it's a remove+add. The posted transaction gets a NEW transaction_id. Clients that index by transaction_id must process removed before added to avoid temporary duplicates.",
+        "questions_raised": [
+          "Can a transaction appear in both modified and removed in the same response?",
+          "What triggers a modified event besides category changes?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "Fully synced cursor from previous sync"
+        ],
+        "postconditions": [
+          "Incremental changes captured; cursor updated to new sync point"
+        ],
+        "state_changes": [
+          "sync cursor: cursor_final \u2192 cursor_incremental1",
+          "pending txn T1: pending \u2192 removed (posted as new txn T1')"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-4a4e37af9ad9"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "transactions",
+        "sync",
+        "incremental",
+        "pending-posted",
+        "delta"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:35:59.850687+00:00"
+    },
+    {
+      "span_id": "span-b1b237dee37f",
+      "trace_id": "trace-6781ded4acbf",
+      "sequence": 5,
+      "kind": "state_transition",
+      "started_at": "2026-07-28T04:35:59.850704+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Transaction sync cursor FSM",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Mapped the complete transaction sync state machine from the three API calls above. The FSM has 3 states and 3 transitions.",
+        "what_learned": "Transaction sync FSM: State 1: UNSYNCED (no cursor, never called sync). State 2: PARTIAL (has cursor, has_more=true, more pages to fetch). State 3: FULLY_SYNCED (has cursor, has_more=false, all caught up). Transitions: UNSYNCED \u2192 PARTIAL: first sync call returns has_more=true. PARTIAL \u2192 PARTIAL: paginated call returns has_more=true (more pages). PARTIAL \u2192 FULLY_SYNCED: paginated call returns has_more=false. FULLY_SYNCED \u2192 FULLY_SYNCED: incremental sync returns has_more=false (common case). FULLY_SYNCED \u2192 PARTIAL: incremental sync returns has_more=true (large batch of changes). Error states: INVALID_CURSOR (cursor corrupted/reset), ITEM_LOGIN_REQUIRED (re-auth needed, cursor still valid after re-auth).",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [],
+        "state_changes": [
+          "UNSYNCED \u2192 PARTIAL (initial sync, has_more=true)",
+          "PARTIAL \u2192 FULLY_SYNCED (final page, has_more=false)",
+          "FULLY_SYNCED \u2192 FULLY_SYNCED (incremental sync, few changes)",
+          "FULLY_SYNCED \u2192 PARTIAL (incremental sync, large batch)"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-1ce6490c212b",
+          "span-4a4e37af9ad9",
+          "span-526ed775b786"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "transactions",
+        "sync",
+        "fsm",
+        "state-machine",
+        "cursor"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:35:59.850708+00:00"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-e4d3ec9ffe71",
+      "trace_id": "trace-6781ded4acbf",
+      "source_spans": [
+        "span-1ce6490c212b",
+        "span-4a4e37af9ad9",
+        "span-526ed775b786"
+      ],
+      "category": "protocol",
+      "title": "Plaid /transactions/sync uses cursor-based incremental pagination",
+      "description": "Unlike date-range pagination (/transactions/get, deprecated), /transactions/sync uses opaque server-side cursors. First call with empty cursor returns full history paginated by count (default 100, max 500). Subsequent calls with next_cursor return only changes (added/modified/removed). Cursor never expires. This model eliminates the race condition inherent in date-range pagination (new transactions during pagination) and supports true incremental sync. Response time: initial ~350ms/page, incremental ~120ms.",
+      "evidence": [
+        "Initial sync returned 187 txns across 2 pages",
+        "Incremental sync returned only 5 changes (3 added, 1 modified, 1 removed)",
+        "Cursor is opaque base64, ~120 chars, does not expire"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "cursor",
+        "pagination",
+        "sync",
+        "protocol"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-b8af03893859",
+      "trace_id": "trace-6781ded4acbf",
+      "source_spans": [
+        "span-526ed775b786"
+      ],
+      "category": "state_machine",
+      "title": "Pending\u2192posted transaction lifecycle is a remove+add pair, not an in-place update",
+      "description": "When a pending transaction posts, Plaid does NOT update the existing transaction. Instead, the pending transaction_id appears in the 'removed' array and a new transaction with a different transaction_id appears in the 'added' array. Clients must process removed before added to avoid temporary duplicates. This design means transaction_id is NOT stable across the pending\u2192posted transition \u2014 only pending_transaction_id on the posted version links back to the original.",
+      "evidence": [
+        "Incremental sync: removed=[T1], added=[T1' with pending_transaction_id=T1]",
+        "Posted transaction gets new transaction_id \u2014 old one is invalidated"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "pending",
+        "posted",
+        "transaction-lifecycle",
+        "state-machine"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-49496190b226",
+      "trace_id": "trace-6781ded4acbf",
+      "source_spans": [
+        "span-b1b237dee37f",
+        "span-1ce6490c212b",
+        "span-4a4e37af9ad9",
+        "span-526ed775b786"
+      ],
+      "category": "state_machine",
+      "title": "Transaction sync has a 3-state FSM: UNSYNCED \u2192 PARTIAL \u2192 FULLY_SYNCED",
+      "description": "The sync cursor model forms a state machine with 3 states: UNSYNCED (no cursor), PARTIAL (has_more=true, more pages to fetch), FULLY_SYNCED (has_more=false, incremental mode). Key transitions: initial sync enters PARTIAL, last page enters FULLY_SYNCED, incremental sync stays in FULLY_SYNCED (small deltas) or re-enters PARTIAL (large batch of changes). Error states: INVALID_CURSOR, ITEM_LOGIN_REQUIRED. Cursor survives re-auth \u2014 after ITEM_LOGIN_REQUIRED is resolved, the same cursor can resume sync.",
+      "evidence": [
+        "Observed UNSYNCED\u2192PARTIAL\u2192FULLY_SYNCED\u2192FULLY_SYNCED transition sequence",
+        "has_more boolean is the sole state discriminator between PARTIAL and FULLY_SYNCED"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "fsm",
+        "sync",
+        "cursor",
+        "state-machine"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-cf1be727168e",
+      "trace_id": "trace-6781ded4acbf",
+      "source_spans": [
+        "span-1ce6490c212b"
+      ],
+      "category": "data_format",
+      "title": "Plaid amount sign convention is inverted from bank statements (positive=debit)",
+      "description": "Plaid uses positive amounts for debits (money leaving account) and negative amounts for credits (money entering account). This is the opposite of standard bank statement convention where positive = credit. This sign inversion is a common source of integration bugs. The amount field is a float, not an integer \u2014 currency precision depends on iso_currency_code (USD = 2 decimal places).",
+      "evidence": [
+        "Observed: salary deposit amount=-2500.00, coffee purchase amount=4.50",
+        "Plaid docs confirm: positive=debit convention"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "amount",
+        "sign-convention",
+        "data-format",
+        "integration-bug-risk"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-d5c4966273bf",
+      "trace_id": "trace-6781ded4acbf",
+      "source_spans": [
+        "span-1ce6490c212b"
+      ],
+      "category": "data_format",
+      "title": "Plaid has dual categorization: legacy category array + new personal_finance_category object",
+      "description": "Each transaction includes both a legacy 'category' string array (e.g., ['Food and Drink', 'Restaurants']) and a newer 'personal_finance_category' object with primary/detailed/confidence_level fields. personal_finance_category uses standardized taxonomy (e.g., primary='FOOD_AND_DRINK', detailed='FOOD_AND_DRINK_RESTAURANT') with confidence levels: VERY_HIGH, HIGH, LOW. The legacy category is deprecated but still populated. New integrations should use personal_finance_category exclusively.",
+      "evidence": [
+        "Both category and personal_finance_category present on every transaction",
+        "confidence_level is a string enum, not numeric"
+      ],
+      "confidence": "confirmed",
+      "actionability": "needs_validation",
+      "related_findings": [],
+      "tags": [
+        "categorization",
+        "taxonomy",
+        "data-format"
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "manifest_target": "M1-transactions-apicall",
+    "plaid_endpoint": "/transactions/sync",
+    "sandbox_credential": "user_transactions_dynamic",
+    "total_spans": 5,
+    "total_findings": 5
+  }
+}

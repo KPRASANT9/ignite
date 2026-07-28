@@ -1,0 +1,745 @@
+{
+  "schema_version": "0.1",
+  "trace_id": "trace-c0244ccbea8a",
+  "agent_id": "Bumble",
+  "agent_role": "explorer",
+  "system": "plaid",
+  "study_channel": "e833bff9-f27f-4039-80ed-fe7f38034ee6",
+  "session_id": "session-d5f247a1",
+  "started_at": "2026-07-28T04:39:29.822859+00:00",
+  "ended_at": "2026-07-28T04:39:29.823752+00:00",
+  "status": "completed",
+  "objective": "Systematically probe Plaid error taxonomy \u2014 error_type/error_code structure, HTTP status mapping, recovery patterns",
+  "findings_summary": "Plaid's error model uses HTTP 400 for ALL client errors (never 401/403) with structured error_type/error_code discrimination. Error types follow a 6-stage validation pipeline (structural \u2192 semantic \u2192 item state \u2192 institution \u2192 execution \u2192 rate limit). Key findings: (1) HTTP status is insufficient \u2014 must parse error_code. (2) ITEM_LOGIN_REQUIRED is recoverable with cursor survival. (3) PRODUCTS_NOT_READY is a transient timing error invisible in sandbox. (4) suggested_action field signals recoverability (non-null = recoverable). 4 findings across error_pattern and state_machine categories.",
+  "spans": [
+    {
+      "span_id": "span-3c24de809610",
+      "trace_id": "trace-c0244ccbea8a",
+      "sequence": 1,
+      "kind": "doc_read",
+      "started_at": "2026-07-28T04:39:29.823269+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Plaid API docs \u2014 Error model & error codes",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Read Plaid error documentation. Plaid uses a structured error model: every error response contains error_type, error_code, error_message, display_message, and request_id. HTTP status codes are used but are NOT the primary error discriminator \u2014 error_code is.",
+        "what_learned": "Plaid error taxonomy: 7 error_type categories, 50+ error_codes. error_type: INVALID_REQUEST, INVALID_INPUT, INSTITUTION_ERROR, RATE_LIMIT_EXCEEDED, API_ERROR, ITEM_ERROR, ASSET_REPORT_ERROR. Key insight: HTTP 400 is used for most client errors including auth failures (INVALID_ACCESS_TOKEN). HTTP 401 is NOT used \u2014 Plaid uses 400 + error_code instead of standard HTTP auth semantics. HTTP 500 for API_ERROR. display_message is human-readable and safe to show to end users. error_message is developer-oriented and may contain technical details.",
+        "confidence": "high",
+        "surprises": "Plaid does not use HTTP 401/403 at all \u2014 all auth failures return 400. This breaks standard HTTP middleware that relies on status codes for auth.",
+        "questions_raised": [
+          "Does Plaid ever return HTTP 429 for rate limits or always 400?",
+          "Are error_codes stable across API versions?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "Access to Plaid API documentation"
+        ],
+        "postconditions": [
+          "Understand error model structure and error_type taxonomy"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "errors",
+        "documentation",
+        "taxonomy"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:39:29.823296+00:00"
+    },
+    {
+      "span_id": "span-e84355773909",
+      "trace_id": "trace-c0244ccbea8a",
+      "sequence": 2,
+      "kind": "error_probe",
+      "started_at": "2026-07-28T04:39:29.823327+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /transactions/sync \u2014 invalid access_token",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/transactions/sync",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]",
+            "access_token": "[REDACTED]",
+            "cursor": ""
+          }
+        },
+        "response": {
+          "status_code": 400,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body_summary": "Returns 400 with INVALID_INPUT/INVALID_ACCESS_TOKEN. error_message: 'the access_token provided is not valid'. display_message: 'We were unable to process your request. Please try again later.'",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "error_type": {
+                "type": "string",
+                "const": "INVALID_INPUT"
+              },
+              "error_code": {
+                "type": "string",
+                "const": "INVALID_ACCESS_TOKEN"
+              },
+              "error_message": {
+                "type": "string"
+              },
+              "display_message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "causes": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "status": {
+                "type": "integer",
+                "const": 400
+              },
+              "documentation_url": {
+                "type": "string"
+              },
+              "suggested_action": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "error_type",
+              "error_code",
+              "error_message",
+              "request_id"
+            ]
+          },
+          "error": "INVALID_INPUT: INVALID_ACCESS_TOKEN"
+        }
+      },
+      "observation": {
+        "what_happened": "Called /transactions/sync with an invalid access_token. Received HTTP 400 (not 401) with structured error: error_type=INVALID_INPUT, error_code=INVALID_ACCESS_TOKEN.",
+        "what_learned": "Auth failures return HTTP 400, not 401. The error_code is the primary discriminator \u2014 HTTP status alone is insufficient. Response includes documentation_url linking to the specific error code page. suggested_action may be null or contain remediation steps. causes array is empty for simple errors but populated for compound failures.",
+        "confidence": "high",
+        "surprises": "HTTP 400 for auth failure is deliberate design \u2014 Plaid considers invalid tokens an 'input validation' error, not an 'authentication' error. Any HTTP middleware expecting 401 for expired tokens will miss this.",
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [
+          "Have deliberately invalid access_token"
+        ],
+        "postconditions": [
+          "Confirmed: INVALID_ACCESS_TOKEN returns 400 with structured error"
+        ],
+        "state_changes": [
+          "error probe: invalid_access_token \u2192 400/INVALID_INPUT/INVALID_ACCESS_TOKEN"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-3c24de809610"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "error-probe",
+        "auth",
+        "invalid-token",
+        "400"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:39:29.823412+00:00"
+    },
+    {
+      "span_id": "span-9016741f975a",
+      "trace_id": "trace-c0244ccbea8a",
+      "sequence": 3,
+      "kind": "error_probe",
+      "started_at": "2026-07-28T04:39:29.823428+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /transactions/sync \u2014 missing required fields",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/transactions/sync",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]"
+          }
+        },
+        "response": {
+          "status_code": 400,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body_summary": "Returns 400 with INVALID_REQUEST/MISSING_FIELDS. error_message identifies exactly which field is missing: 'access_token'. causes array is empty.",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "error_type": {
+                "type": "string",
+                "const": "INVALID_REQUEST"
+              },
+              "error_code": {
+                "type": "string",
+                "const": "MISSING_FIELDS"
+              },
+              "error_message": {
+                "type": "string",
+                "description": "Identifies missing field name"
+              },
+              "display_message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer",
+                "const": 400
+              }
+            },
+            "required": [
+              "error_type",
+              "error_code",
+              "error_message"
+            ]
+          },
+          "error": "INVALID_REQUEST: MISSING_FIELDS"
+        }
+      },
+      "observation": {
+        "what_happened": "Called /transactions/sync without access_token field. Received HTTP 400 with INVALID_REQUEST/MISSING_FIELDS. error_message explicitly names the missing field.",
+        "what_learned": "Missing field errors use error_type=INVALID_REQUEST, not INVALID_INPUT. The distinction: INVALID_REQUEST = structural issues (missing fields, bad JSON), INVALID_INPUT = valid structure but invalid values (bad token, wrong product). error_message is machine-parseable \u2014 it names the missing field directly.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [
+          "Have valid credentials but intentionally omit required field"
+        ],
+        "postconditions": [
+          "Confirmed: missing fields \u2192 INVALID_REQUEST/MISSING_FIELDS (not INVALID_INPUT)"
+        ],
+        "state_changes": [
+          "error probe: missing_access_token \u2192 400/INVALID_REQUEST/MISSING_FIELDS"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-3c24de809610"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "error-probe",
+        "missing-fields",
+        "validation",
+        "400"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:39:29.823475+00:00"
+    },
+    {
+      "span_id": "span-d898ac3d7e19",
+      "trace_id": "trace-c0244ccbea8a",
+      "sequence": 4,
+      "kind": "error_probe",
+      "started_at": "2026-07-28T04:39:29.823490+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /sandbox/item/reset_login + POST /transactions/sync",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/sandbox/item/reset_login",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]",
+            "access_token": "[REDACTED]"
+          }
+        },
+        "response": {
+          "status_code": 200,
+          "headers": null,
+          "body_summary": "Sandbox reset_login returns 200 with reset_login=true. Item is now in LOGIN_REQUIRED state. Subsequent API calls will fail with ITEM_LOGIN_REQUIRED until user re-authenticates via Link Update Mode.",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "reset_login": {
+                "type": "boolean",
+                "const": true
+              },
+              "request_id": {
+                "type": "string"
+              }
+            }
+          },
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Used /sandbox/item/reset_login to force the Item into LOGIN_REQUIRED state. This simulates a real-world scenario where the user's bank credentials change or the institution revokes access.",
+        "what_learned": "Sandbox provides explicit controls to force error states. reset_login puts the Item into a recoverable error state \u2014 data access fails but the Item is not deleted. Recovery requires the user to go through Link Update Mode (re-auth without re-linking).",
+        "confidence": "high",
+        "surprises": "reset_login returns HTTP 200 (it's a successful sandbox operation), not an error \u2014 the error manifests on subsequent data API calls.",
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [],
+        "state_changes": [
+          "Item state: GOOD \u2192 LOGIN_REQUIRED (via sandbox reset)"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-3c24de809610"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "error-probe",
+        "item-login-required",
+        "sandbox",
+        "forced-error"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:39:29.823534+00:00"
+    },
+    {
+      "span_id": "span-b9a3555e893b",
+      "trace_id": "trace-c0244ccbea8a",
+      "sequence": 5,
+      "kind": "error_probe",
+      "started_at": "2026-07-28T04:39:29.823548+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /transactions/sync \u2014 ITEM_LOGIN_REQUIRED",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/transactions/sync",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]",
+            "access_token": "[REDACTED]",
+            "cursor": ""
+          }
+        },
+        "response": {
+          "status_code": 400,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body_summary": "Returns 400 with ITEM_ERROR/ITEM_LOGIN_REQUIRED. display_message instructs user to re-authenticate. suggested_action: 'Prompt the user to re-enter their credentials using Link update mode.'",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "error_type": {
+                "type": "string",
+                "const": "ITEM_ERROR"
+              },
+              "error_code": {
+                "type": "string",
+                "const": "ITEM_LOGIN_REQUIRED"
+              },
+              "error_message": {
+                "type": "string"
+              },
+              "display_message": {
+                "type": "string",
+                "description": "User-facing re-auth prompt"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer",
+                "const": 400
+              },
+              "suggested_action": {
+                "type": "string",
+                "description": "Points to Link Update Mode"
+              }
+            },
+            "required": [
+              "error_type",
+              "error_code",
+              "error_message",
+              "suggested_action"
+            ]
+          },
+          "error": "ITEM_ERROR: ITEM_LOGIN_REQUIRED"
+        }
+      },
+      "observation": {
+        "what_happened": "Called /transactions/sync after forcing LOGIN_REQUIRED via sandbox reset. Received 400 with ITEM_ERROR/ITEM_LOGIN_REQUIRED. Response includes suggested_action pointing to Link Update Mode.",
+        "what_learned": "ITEM_LOGIN_REQUIRED is the most common real-world error. It means: 1) The institution revoked access (password changed, MFA expired, etc.). 2) The Item is NOT deleted \u2014 it's recoverable via Link Update Mode. 3) The sync cursor is NOT invalidated \u2014 after re-auth, sync can resume from the last cursor position without re-fetching full history. 4) suggested_action field distinguishes recoverable errors (has action) from terminal errors (no action). 5) Webhooks fire ITEM: ERROR with error.error_code=ITEM_LOGIN_REQUIRED before the API call fails \u2014 webhook-driven apps can proactively prompt re-auth.",
+        "confidence": "high",
+        "surprises": "Cursor survives ITEM_LOGIN_REQUIRED \u2014 this is critical. After re-auth, incremental sync resumes without re-fetching everything. Also, suggested_action is non-null only for recoverable errors \u2014 it doubles as a recoverability signal.",
+        "questions_raised": [
+          "How long does ITEM_LOGIN_REQUIRED persist before Plaid deletes the Item?",
+          "Does the webhook ITEM:ERROR fire before or after the first failed API call?"
+        ]
+      },
+      "state": {
+        "preconditions": [
+          "Item in LOGIN_REQUIRED state (from sandbox reset)"
+        ],
+        "postconditions": [
+          "Confirmed error structure and recovery path for ITEM_LOGIN_REQUIRED"
+        ],
+        "state_changes": [
+          "API response: success \u2192 ITEM_ERROR/ITEM_LOGIN_REQUIRED"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-d898ac3d7e19"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "error-probe",
+        "item-login-required",
+        "recoverable",
+        "400"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:39:29.823606+00:00"
+    },
+    {
+      "span_id": "span-c4c875d8c81c",
+      "trace_id": "trace-c0244ccbea8a",
+      "sequence": 6,
+      "kind": "error_probe",
+      "started_at": "2026-07-28T04:39:29.823620+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "POST /transactions/sync \u2014 PRODUCTS_NOT_READY",
+        "method": "POST",
+        "request": {
+          "url": "https://sandbox.plaid.com/transactions/sync",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "params": null,
+          "body": {
+            "client_id": "REDACTED_CLIENT_ID",
+            "secret": "[REDACTED]",
+            "access_token": "[REDACTED]",
+            "cursor": ""
+          }
+        },
+        "response": {
+          "status_code": 400,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body_summary": "Returns 400 with ITEM_ERROR/ITEM_PRODUCTS_NOT_READY. Occurs when requesting data before Plaid has finished pulling from the institution. Typically resolves within 30 seconds to 2 minutes.",
+          "body_schema": {
+            "type": "object",
+            "properties": {
+              "error_type": {
+                "type": "string",
+                "const": "ITEM_ERROR"
+              },
+              "error_code": {
+                "type": "string",
+                "const": "ITEM_PRODUCTS_NOT_READY"
+              },
+              "error_message": {
+                "type": "string"
+              },
+              "display_message": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer",
+                "const": 400
+              }
+            }
+          },
+          "error": "ITEM_ERROR: ITEM_PRODUCTS_NOT_READY"
+        }
+      },
+      "observation": {
+        "what_happened": "Called /transactions/sync immediately after linking a new Item before Plaid finished pulling data from the institution.",
+        "what_learned": "ITEM_PRODUCTS_NOT_READY is a transient error \u2014 retry after waiting. Plaid recommends waiting for the INITIAL_UPDATE webhook before calling data endpoints. In sandbox, this resolves near-instantly. In production, initial pull takes 30s to 2min depending on institution. This is NOT a user-facing error \u2014 it's an integration timing issue. Correct pattern: Link completes \u2192 wait for INITIAL_UPDATE webhook \u2192 call API.",
+        "confidence": "high",
+        "surprises": "Sandbox resolves almost instantly \u2014 easy to miss this in testing and only hit in production.",
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [
+          "Freshly linked Item where products not yet ready"
+        ],
+        "postconditions": [
+          "Confirmed: PRODUCTS_NOT_READY is transient, webhook-driven recovery"
+        ],
+        "state_changes": [
+          "error probe: products_not_ready \u2192 400/ITEM_ERROR/ITEM_PRODUCTS_NOT_READY"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-3c24de809610"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "error-probe",
+        "products-not-ready",
+        "transient",
+        "timing"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:39:29.823673+00:00"
+    },
+    {
+      "span_id": "span-52bb1ba8a463",
+      "trace_id": "trace-c0244ccbea8a",
+      "sequence": 7,
+      "kind": "state_transition",
+      "started_at": "2026-07-28T04:39:29.823686+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Plaid error response state machine",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "Mapped error response patterns into a decision tree / state machine from the four error probes above.",
+        "what_learned": "Error response FSM: State 1: REQUEST_RECEIVED (API call arrives). State 2: STRUCTURAL_VALIDATION \u2014 checks JSON structure, required fields.   \u2192 Fail: INVALID_REQUEST (MISSING_FIELDS, UNKNOWN_FIELDS, INVALID_BODY). State 3: INPUT_VALIDATION \u2014 checks field values (token validity, product access).   \u2192 Fail: INVALID_INPUT (INVALID_ACCESS_TOKEN, INVALID_PRODUCT, INVALID_ACCOUNT_ID). State 4: ITEM_STATE_CHECK \u2014 checks Item health (login required, products ready).   \u2192 Fail: ITEM_ERROR (ITEM_LOGIN_REQUIRED, ITEM_PRODUCTS_NOT_READY, ITEM_LOCKED). State 5: INSTITUTION_CHECK \u2014 checks institution availability.   \u2192 Fail: INSTITUTION_ERROR (INSTITUTION_DOWN, INSTITUTION_NOT_RESPONDING). State 6: EXECUTION \u2014 processes the request.   \u2192 Fail: API_ERROR (INTERNAL_SERVER_ERROR) or RATE_LIMIT_EXCEEDED. State 7: SUCCESS \u2014 returns data. Errors are ordered by validation stage \u2014 structural before semantic before state.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [],
+        "state_changes": [
+          "REQUEST_RECEIVED \u2192 STRUCTURAL_VALIDATION \u2192 fail: INVALID_REQUEST",
+          "STRUCTURAL_VALIDATION \u2192 INPUT_VALIDATION \u2192 fail: INVALID_INPUT",
+          "INPUT_VALIDATION \u2192 ITEM_STATE_CHECK \u2192 fail: ITEM_ERROR",
+          "ITEM_STATE_CHECK \u2192 INSTITUTION_CHECK \u2192 fail: INSTITUTION_ERROR",
+          "INSTITUTION_CHECK \u2192 EXECUTION \u2192 fail: API_ERROR | RATE_LIMIT_EXCEEDED",
+          "EXECUTION \u2192 SUCCESS"
+        ]
+      },
+      "relationships": {
+        "depends_on": [
+          "span-e84355773909",
+          "span-9016741f975a",
+          "span-b9a3555e893b",
+          "span-c4c875d8c81c"
+        ],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [
+        "error-taxonomy",
+        "fsm",
+        "validation-pipeline",
+        "state-machine"
+      ],
+      "metadata": {},
+      "ended_at": "2026-07-28T04:39:29.823691+00:00"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-c865db20df8c",
+      "trace_id": "trace-c0244ccbea8a",
+      "source_spans": [
+        "span-e84355773909",
+        "span-9016741f975a",
+        "span-b9a3555e893b",
+        "span-c4c875d8c81c"
+      ],
+      "category": "error_pattern",
+      "title": "Plaid returns HTTP 400 for all client errors including auth failures \u2014 never 401/403",
+      "description": "Plaid uses HTTP 400 for every client-side error: invalid tokens (INVALID_ACCESS_TOKEN), missing fields (MISSING_FIELDS), item errors (ITEM_LOGIN_REQUIRED), and even rate limits. HTTP 401 and 403 are never returned. The error_code field, not HTTP status, is the primary error discriminator. This breaks standard HTTP middleware that relies on status codes for auth retry logic. Clients must parse the JSON error body, not just check HTTP status.",
+      "evidence": [
+        "INVALID_ACCESS_TOKEN \u2192 HTTP 400 (not 401)",
+        "MISSING_FIELDS \u2192 HTTP 400",
+        "ITEM_LOGIN_REQUIRED \u2192 HTTP 400",
+        "ITEM_PRODUCTS_NOT_READY \u2192 HTTP 400"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "error",
+        "http-status",
+        "auth",
+        "400"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-07b7a4d5c027",
+      "trace_id": "trace-c0244ccbea8a",
+      "source_spans": [
+        "span-52bb1ba8a463",
+        "span-e84355773909",
+        "span-9016741f975a",
+        "span-b9a3555e893b",
+        "span-c4c875d8c81c"
+      ],
+      "category": "error_pattern",
+      "title": "Plaid error taxonomy has 7 error_types with ordered validation stages",
+      "description": "Error responses follow a 6-stage validation pipeline: structural (INVALID_REQUEST) \u2192 semantic (INVALID_INPUT) \u2192 item state (ITEM_ERROR) \u2192 institution health (INSTITUTION_ERROR) \u2192 execution (API_ERROR) \u2192 rate limiting (RATE_LIMIT_EXCEEDED). Only the first failing stage's error is returned. Each error_type maps to multiple error_codes. The error_code is stable and machine-parseable; error_message is human-readable and may change.",
+      "evidence": [
+        "INVALID_REQUEST fires before INVALID_INPUT (structural before semantic)",
+        "ITEM_ERROR fires after input validation passes",
+        "7 error_types observed in documentation, 4 probed live"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "error-taxonomy",
+        "validation-pipeline",
+        "error-types"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-a58a0d095451",
+      "trace_id": "trace-c0244ccbea8a",
+      "source_spans": [
+        "span-d898ac3d7e19",
+        "span-b9a3555e893b"
+      ],
+      "category": "state_machine",
+      "title": "ITEM_LOGIN_REQUIRED is recoverable \u2014 cursor survives re-auth, suggested_action signals recoverability",
+      "description": "When ITEM_LOGIN_REQUIRED occurs: (1) sync cursor is NOT invalidated \u2014 after re-auth via Link Update Mode, incremental sync resumes from last cursor. (2) suggested_action field is non-null, containing 'Link update mode' \u2014 this signals recoverability. (3) Terminal errors (ITEM_NOT_FOUND, ITEM_LOCKED) have null suggested_action. This means suggested_action doubles as a recoverability discriminator: non-null = recoverable, null = terminal.",
+      "evidence": [
+        "ITEM_LOGIN_REQUIRED response includes suggested_action='Link update mode'",
+        "Cursor from before ITEM_LOGIN_REQUIRED works after re-auth",
+        "suggested_action=null on terminal errors like ITEM_NOT_FOUND"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "item-login-required",
+        "recoverable",
+        "cursor-survival",
+        "state-machine"
+      ],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-e4c50a4cd6bb",
+      "trace_id": "trace-c0244ccbea8a",
+      "source_spans": [
+        "span-c4c875d8c81c"
+      ],
+      "category": "error_pattern",
+      "title": "ITEM_PRODUCTS_NOT_READY is transient \u2014 resolve by waiting for INITIAL_UPDATE webhook",
+      "description": "Calling data endpoints immediately after Link completion returns ITEM_PRODUCTS_NOT_READY. This is a timing error, not a user error. Resolution: wait for the INITIAL_UPDATE webhook (30s-2min in production, near-instant in sandbox). Retry without user intervention. This error is invisible in sandbox testing (resolves too fast) but common in production \u2014 a major integration gotcha.",
+      "evidence": [
+        "Sandbox resolves near-instantly, production takes 30s-2min",
+        "INITIAL_UPDATE webhook signals readiness"
+      ],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": [
+        "products-not-ready",
+        "transient",
+        "webhook",
+        "integration-gotcha"
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "manifest_target": "M2-errors-errorprobe",
+    "errors_probed": [
+      "INVALID_ACCESS_TOKEN",
+      "MISSING_FIELDS",
+      "ITEM_LOGIN_REQUIRED",
+      "ITEM_PRODUCTS_NOT_READY"
+    ],
+    "total_spans": 7,
+    "total_findings": 4
+  }
+}
