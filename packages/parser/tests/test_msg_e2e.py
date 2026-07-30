@@ -18,7 +18,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "trace-sdk" / "src"
 from ignite_parser.parser import parse_trace
 from ignite_parser.analyzer import analyze
 from ignite_parser.optimizer import optimize
-from ignite_parser.models import Modality, RequestIntent, ResponseOutcome, SpanStructure
+from ignite_parser.spike import (
+    SpikeSignal,
+    SpikeType,
+    Urgency,
+    classify_signal,
+    compute_correlation_boost,
+    detect_spikes,
+)
+from ignite_parser.models import (
+    Modality,
+    RequestIntent,
+    ResponseOutcome,
+    SignalClass,
+    SpanStructure,
+)
 
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "trace_msg_session_010.json"
@@ -218,3 +232,108 @@ class TestAllFiveModalities:
         opt = optimize(analyses)
         assert opt.source_analysis_count == 5
         assert opt.coverage.total_traces == 5
+
+
+# --- Spike Signal Detection E2E ---
+
+
+class TestSpikeDetectionE2E:
+    def test_detect_spikes_on_message_trace(self, parsed_trace):
+        """Spike detection pipeline runs on message traces."""
+        spikes = detect_spikes([parsed_trace], system="ignite")
+        assert len(spikes) >= 1
+
+    def test_error_spike_detected(self, parsed_trace):
+        """The broker_unavailable error produces an error spike."""
+        spikes = detect_spikes([parsed_trace], system="ignite")
+        error_spikes = [s for s in spikes if s.spike_type == SpikeType.ERROR]
+        assert len(error_spikes) >= 1
+
+    def test_error_spike_has_action_space(self, parsed_trace):
+        """Error spikes include actionable options for L3."""
+        spikes = detect_spikes([parsed_trace], system="ignite")
+        error_spikes = [s for s in spikes if s.spike_type == SpikeType.ERROR]
+        assert len(error_spikes) >= 1
+        assert len(error_spikes[0].action_space) >= 1
+
+    def test_spike_confidence_in_range(self, parsed_trace):
+        """All spike confidences are in [0, 1]."""
+        spikes = detect_spikes([parsed_trace], system="ignite")
+        for spike in spikes:
+            assert 0.0 <= spike.confidence <= 1.0
+
+    def test_spikes_sorted_by_confidence(self, parsed_trace):
+        """Spikes are returned in descending confidence order."""
+        spikes = detect_spikes([parsed_trace], system="ignite")
+        if len(spikes) >= 2:
+            for i in range(len(spikes) - 1):
+                assert spikes[i].confidence >= spikes[i + 1].confidence
+
+    def test_spike_modalities_populated(self, parsed_trace):
+        """All spikes have at least one modality."""
+        spikes = detect_spikes([parsed_trace], system="ignite")
+        for spike in spikes:
+            assert len(spike.modalities) >= 1
+
+    def test_correlation_boost_values(self):
+        """Correlation boost multipliers match Honey spec."""
+        assert compute_correlation_boost(1) == 1.0
+        assert compute_correlation_boost(2) == 1.5
+        assert compute_correlation_boost(3) == 2.0
+        assert compute_correlation_boost(5) == 2.0  # 3+ caps at 2.0
+
+    def test_noise_signal_classification(self):
+        """CLI noise commands (cd, ls) classified as noise."""
+        from ignite_parser.models import Span, Interaction, Observation
+        noise_span = Span(
+            span_id="noise-1",
+            trace_id="t1",
+            sequence=1,
+            kind="api_call",
+            started_at="2026-07-30T00:00:00Z",
+            modality=Modality.CLI.value,
+            signal_class=SignalClass.NOISE.value,
+            interaction=Interaction(target="cd /tmp"),
+            observation=Observation(what_happened="Changed directory"),
+            modality_ext={"type": "cli_ext", "command": "cd"},
+        )
+        assert classify_signal(noise_span) == SignalClass.NOISE.value
+
+    def test_intent_carrying_classification(self):
+        """Message publish classified as intent_carrying."""
+        from ignite_parser.models import Span, Interaction, Observation
+        msg_span = Span(
+            span_id="msg-1",
+            trace_id="t1",
+            sequence=1,
+            kind="api_call",
+            started_at="2026-07-30T00:00:00Z",
+            modality=Modality.MESSAGE.value,
+            signal_class=SignalClass.INTENT_CARRYING.value,
+            interaction=Interaction(target="publish ci.trigger"),
+            observation=Observation(what_happened="Published CI trigger"),
+            modality_ext={"type": "msg_ext", "operation": "publish"},
+        )
+        assert classify_signal(msg_span) == SignalClass.INTENT_CARRYING.value
+
+    def test_message_noise_filtered(self):
+        """Message heartbeat classified as noise."""
+        from ignite_parser.models import Span, Interaction, Observation
+        heartbeat = Span(
+            span_id="hb-1",
+            trace_id="t1",
+            sequence=1,
+            kind="api_call",
+            started_at="2026-07-30T00:00:00Z",
+            modality=Modality.MESSAGE.value,
+            interaction=Interaction(target="heartbeat"),
+            observation=Observation(what_happened="Heartbeat ping"),
+            modality_ext={"type": "msg_ext", "operation": "heartbeat"},
+        )
+        assert classify_signal(heartbeat) == SignalClass.NOISE.value
+
+    def test_spike_source_system(self, parsed_trace):
+        """Spikes carry the source system identifier."""
+        spikes = detect_spikes([parsed_trace], system="ignite")
+        for spike in spikes:
+            assert spike.source_system != ""
