@@ -16,6 +16,7 @@ from ignite_parser.models import (
     Finding,
     FindingCategory,
     FindingConfidence,
+    Modality,
     Span,
     SpanKind,
     Trace,
@@ -109,6 +110,19 @@ class FindingCluster:
 
 
 @dataclass
+class ModalityProfile:
+    """Cross-modality feature profile for a single modality."""
+    modality: str = ""
+    span_count: int = 0
+    avg_duration_ms: float = 0.0
+    total_duration_ms: int = 0
+    success_rate: float = 0.0
+    error_rate: float = 0.0
+    span_kinds: set[str] = field(default_factory=set)
+    unique_targets: set[str] = field(default_factory=set)
+
+
+@dataclass
 class CoverageReport:
     """What has been explored vs. what remains unknown."""
     total_traces: int = 0
@@ -120,6 +134,7 @@ class CoverageReport:
     agent_roles_active: set[str] = field(default_factory=set)
     open_questions: list[str] = field(default_factory=list)
     low_confidence_areas: list[str] = field(default_factory=list)
+    modalities_seen: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -129,6 +144,7 @@ class AnalysisResult:
     graph: DependencyGraph = field(default_factory=DependencyGraph)
     finding_clusters: list[FindingCluster] = field(default_factory=list)
     coverage: CoverageReport = field(default_factory=CoverageReport)
+    modality_profiles: dict[str, ModalityProfile] = field(default_factory=dict)
 
     @property
     def endpoint_count(self) -> int:
@@ -155,6 +171,7 @@ def analyze(traces: list[Trace]) -> AnalysisResult:
     _build_dependency_graph(traces, result)
     _build_finding_index(traces, result)
     _build_coverage_report(traces, result)
+    _build_modality_profiles(traces, result)
 
     return result
 
@@ -294,6 +311,7 @@ def _build_coverage_report(traces: list[Trace], result: AnalysisResult) -> None:
 
         for span in trace.spans:
             cov.span_kinds_seen.add(span.kind)
+            cov.modalities_seen.add(span.modality.value)
 
             # Collect unique open questions
             for q in span.observation.questions_raised:
@@ -309,3 +327,46 @@ def _build_coverage_report(traces: list[Trace], result: AnalysisResult) -> None:
 
         for finding in trace.findings:
             cov.finding_categories_seen.add(finding.category)
+
+
+def _build_modality_profiles(traces: list[Trace], result: AnalysisResult) -> None:
+    """Extract cross-modality feature profiles: frequency, timing, success/error rates.
+
+    Groups spans by modality and computes per-modality statistics that the
+    Optimizer can use to identify cross-modality patterns and anomalies.
+    """
+    from ignite_parser.models import ResponseOutcome
+
+    modality_spans: dict[str, list[Span]] = {}
+
+    for trace in traces:
+        for span in trace.spans:
+            mod = span.modality.value
+            if mod not in modality_spans:
+                modality_spans[mod] = []
+            modality_spans[mod].append(span)
+
+    for mod, spans in modality_spans.items():
+        count = len(spans)
+        total_dur = sum(s.duration_ms for s in spans)
+        avg_dur = total_dur / count if count > 0 else 0.0
+
+        success_count = sum(
+            1 for s in spans if s.response_outcome == ResponseOutcome.SUCCESS
+        )
+        error_count = sum(
+            1 for s in spans
+            if s.response_outcome in (ResponseOutcome.ERROR, ResponseOutcome.AUTH_FAILURE)
+        )
+
+        profile = ModalityProfile(
+            modality=mod,
+            span_count=count,
+            avg_duration_ms=round(avg_dur, 1),
+            total_duration_ms=total_dur,
+            success_rate=round(success_count / count, 3) if count > 0 else 0.0,
+            error_rate=round(error_count / count, 3) if count > 0 else 0.0,
+            span_kinds={s.kind.value for s in spans},
+            unique_targets={s.interaction.target for s in spans if s.interaction.target},
+        )
+        result.modality_profiles[mod] = profile

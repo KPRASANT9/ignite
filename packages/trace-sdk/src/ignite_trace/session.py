@@ -47,6 +47,7 @@ class TraceSession:
         session_id: str | None = None,
         output_dir: str | Path | None = None,
         study_channel: str = "",
+        session_intent: str | None = None,
     ):
         self.trace_id = f"trace-{uuid.uuid4().hex[:12]}"
         self.agent = agent
@@ -65,6 +66,7 @@ class TraceSession:
         self._status = "active"
         self._findings_summary: str | None = None
         self._metadata: dict[str, Any] = {}
+        self._session_intent: str | None = session_intent
 
     def __enter__(self) -> TraceSession:
         self._started_at = datetime.now(timezone.utc)
@@ -130,10 +132,15 @@ class TraceSession:
         self._metadata[key] = value
         return self
 
+    def intent(self, session_intent: str) -> TraceSession:
+        """Set the session-level intent for this trace."""
+        self._session_intent = session_intent
+        return self
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize the complete trace to dict format."""
-        return {
-            "schema_version": "0.1",
+        d: dict[str, Any] = {
+            "schema_version": "0.2",
             "trace_id": self.trace_id,
             "agent_id": self.agent,
             "agent_role": self.agent_role,
@@ -149,6 +156,9 @@ class TraceSession:
             "findings": [f.to_dict() for f in self._findings],
             "metadata": self._metadata,
         }
+        if self._session_intent is not None:
+            d["session_intent"] = self._session_intent
+        return d
 
     def to_json(self, indent: int = 2) -> str:
         """Serialize the complete trace to JSON string."""

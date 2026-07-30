@@ -40,6 +40,7 @@ class SpanKind(str, Enum):
     ERROR_PROBE = "error_probe"
     STATE_TRANSITION = "state_transition"
     ACTION_RESULT = "action_result"
+    WORKFLOW_TRACE = "workflow_trace"
 
 
 class FindingCategory(str, Enum):
@@ -52,6 +53,10 @@ class FindingCategory(str, Enum):
     DEPENDENCY = "dependency"
     COMPLIANCE = "compliance"
     UNDOCUMENTED = "undocumented"
+    TRACE_SURFACE = "trace_surface"
+    CROSS_MODALITY = "cross_modality"
+    INTELLIGENCE = "intelligence"
+    ARCHITECTURE = "architecture"
 
 
 class Confidence(str, Enum):
@@ -72,7 +77,94 @@ class Actionability(str, Enum):
     INFORMATIONAL = "informational"
 
 
+# --- v0.2 classification enums ---
+
+class Modality(str, Enum):
+    API = "api"
+    WEB = "web"
+    DB = "db"
+    CLI = "cli"
+    MESSAGE = "message"
+    CUSTOM = "custom"
+
+
+class RequestIntent(str, Enum):
+    STATE_TRANSITION = "state_transition"
+    QUERY = "query"
+    MUTATION = "mutation"
+    CONFIG_CHANGE = "config_change"
+    DECISION = "decision"
+
+
+class ResponseOutcome(str, Enum):
+    SUCCESS = "success"
+    ERROR = "error"
+    PARTIAL = "partial"
+    TIMEOUT = "timeout"
+    RATE_LIMITED = "rate_limited"
+    AUTH_FAILURE = "auth_failure"
+    ASYNC_PENDING = "async_pending"  # Expected wait state (e.g., PRODUCT_NOT_READY), not an error
+
+
+class SignalClass(str, Enum):
+    INTENT_CARRYING = "intent_carrying"
+    NOISE = "noise"
+    AMBIGUOUS = "ambiguous"
+
+
+class DeltaFromPrior(str, Enum):
+    NONE = "none"
+    PARTIAL = "partial"
+    FULL = "full"
+
+
+class StateTransitionSubtype(str, Enum):
+    LIFECYCLE_START = "lifecycle_start"
+    STATE_CHANGE = "state_change"
+
+
+class SpanStructure(str, Enum):
+    """How spans within a session relate to each other structurally."""
+    INDEPENDENT = "independent"        # API — each span is self-contained
+    NARRATIVE = "narrative"            # CLI — sequence tells a story
+    TRANSACTIONAL = "transactional"    # DB — atomically grouped operations
+    NAVIGATIONAL = "navigational"      # Web — page/state navigation flow
+    SEQUENTIAL = "sequential"          # Generic ordered sequence
+    CONVERSATIONAL = "conversational"  # Message — request/reply exchanges
+    THREADED = "threaded"              # Message — parallel conversation threads
+
+
+class SessionIntent(str, Enum):
+    """Purpose of the entire session — why the agent executed this sequence."""
+    VALIDATION = "validation"          # assess → verify → execute → measure
+    DEBUGGING = "debugging"            # reproduce → isolate → fix → verify
+    DEPLOYMENT = "deployment"          # pull → build → test → deploy
+    EXPLORATION = "exploration"        # navigate → inspect → read → understand
+    CONFIGURATION = "configuration"    # read → modify → test → apply
+    MONITORING = "monitoring"          # observe → alert → diagnose → resolve
+
+
+class CorrectionAction(str, Enum):
+    """ErrP correction strategy — what to do when intent diverges from outcome."""
+    BACKOFF_RETRY = "backoff_retry"
+    REAUTH_RETRY = "reauth_retry"
+    LOG_ESCALATE = "log_escalate"
+    IDEMPOTENCY_RETRY = "idempotency_retry"
+    RESTART_FLOW = "restart_flow"
+    ESCALATE_HUMAN = "escalate_human"
+
+
 # --- Data classes ---
+
+@dataclass
+class ContainsContext:
+    """A cross-modality context reference within a span."""
+    modality: str = ""
+    relationship: str = ""  # processes, reads_from, writes_to, triggers, analyzes, learns_from, wraps, embeds
+    active: bool = True     # True = data flows now; False = architecturally possible but not realized
+    context_id: str | None = None
+    description: str | None = None
+
 
 @dataclass
 class Request:
@@ -124,6 +216,19 @@ class Relationships:
 
 
 @dataclass
+class ExpectedOutcome:
+    """What the agent/system expected to happen — set before execution."""
+    description: str = ""
+    confidence: float = 0.0  # 0.0-1.0 — how confident was the prediction
+
+
+@dataclass
+class ActualOutcome:
+    """What actually happened — set after execution."""
+    description: str = ""
+
+
+@dataclass
 class Span:
     span_id: str = ""
     trace_id: str = ""
@@ -139,6 +244,24 @@ class Span:
     relationships: Relationships = field(default_factory=Relationships)
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # v0.2 classification fields (all optional with defaults for backward compat)
+    modality: Modality = Modality.API
+    request_intent: RequestIntent = RequestIntent.QUERY
+    response_outcome: ResponseOutcome = ResponseOutcome.SUCCESS
+    signal_class: SignalClass = SignalClass.INTENT_CARRYING
+    delta_from_prior: DeltaFromPrior = DeltaFromPrior.FULL
+    state_transition_subtype: StateTransitionSubtype | None = None
+    correlation_ids: list[str] = field(default_factory=list)
+    # v0.2 feedback divergence fields
+    expected_outcome: ExpectedOutcome | None = None
+    actual_outcome: ActualOutcome | None = None
+    divergence_score: float | None = None
+    # v0.2 modality extension (typed per-modality interaction data)
+    modality_ext: dict[str, Any] | None = None
+    # Schema v13 fields
+    span_structure: SpanStructure | None = None
+    contains_contexts: list[ContainsContext] = field(default_factory=list)
+    compression_ratio: float | None = None
 
 
 @dataclass
@@ -174,6 +297,8 @@ class Trace:
     spans: list[Span] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Schema v13 field
+    session_intent: SessionIntent | None = None
 
 
 # --- Parse result ---

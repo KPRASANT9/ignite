@@ -232,7 +232,7 @@ class TestRoundTrip:
         d = t.to_dict()
 
         # Required trace-level fields
-        assert d["schema_version"] == "0.1"
+        assert d["schema_version"] in ("0.1", "0.2")
         assert d["trace_id"]
         assert d["agent_id"]
         assert d["agent_role"]

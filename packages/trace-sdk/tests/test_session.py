@@ -12,7 +12,7 @@ class TestTraceSessionLifecycle:
         with TraceSession(agent="TestAgent", system="test", objective="test obj") as t:
             pass
         d = t.to_dict()
-        assert d["schema_version"] == "0.1"
+        assert d["schema_version"] in ("0.1", "0.2")
         assert d["agent_id"] == "TestAgent"
         assert d["system"] == "test"
         assert d["objective"] == "test obj"

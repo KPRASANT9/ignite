@@ -1,0 +1,270 @@
+{
+  "schema_version": "0.2",
+  "trace_id": "trace-cli-session-006",
+  "agent_id": "ProductExplorer",
+  "agent_role": "explorer",
+  "system": "study-product",
+  "study_channel": "",
+  "session_id": "session-cli-006",
+  "started_at": "2026-07-29T08:00:00+00:00",
+  "ended_at": "2026-07-29T08:05:00+00:00",
+  "status": "completed",
+  "objective": "Validate whether the universal trace surface schema captures a real CLI session with enough fidelity for an operator agent to learn from it",
+  "session_intent": "validation",
+  "findings_summary": "CLI sessions have narrative structure — command sequences tell stories. Intelligence density is 3x higher than API per span. Cross-modality nesting (CLI wrapping API traces) confirmed.",
+  "spans": [
+    {
+      "span_id": "cli-001",
+      "trace_id": "trace-cli-session-006",
+      "sequence": 1,
+      "kind": "workflow_trace",
+      "started_at": "2026-07-29T08:00:00+00:00",
+      "ended_at": "2026-07-29T08:00:01+00:00",
+      "duration_ms": 450,
+      "modality": "cli",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "narrative",
+      "interaction": {
+        "target": "git status on IGNITE monorepo",
+        "method": null,
+        "request": {"url": null, "headers": null, "params": null, "body": null},
+        "response": {"status_code": null, "headers": null, "body_summary": "12 modified files, 21 untracked files on schema-v0.2-batch1 branch", "body_schema": null, "error": null}
+      },
+      "observation": {
+        "what_happened": "git status reveals 12 modified files and 21 untracked files on schema-v0.2-batch1 branch. Heavy uncommitted work spanning both packages.",
+        "what_learned": "CLI trace surface must capture STATE CONTEXT: which branch, what was modified, what was untracked. An operator agent seeing this trace knows there is significant uncommitted work spanning both packages.",
+        "confidence": "high",
+        "surprises": "21 untracked files means major new modules exist only locally.",
+        "questions_raised": ["Should cli_ext include a diff_summary field for modified files?"]
+      },
+      "state": {"preconditions": [], "postconditions": ["working_tree_dirty"], "state_changes": []},
+      "relationships": {"depends_on": [], "enables": ["cli-002"], "contradicts": [], "refines": []},
+      "tags": ["git", "status"],
+      "metadata": {},
+      "modality_ext": {
+        "type": "cli_ext",
+        "command": "git",
+        "subcommand": "status",
+        "args": [],
+        "exit_code": 0,
+        "working_dir": "REPOS/ignite",
+        "shell": "zsh"
+      }
+    },
+    {
+      "span_id": "cli-002",
+      "trace_id": "trace-cli-session-006",
+      "sequence": 2,
+      "kind": "workflow_trace",
+      "started_at": "2026-07-29T08:00:02+00:00",
+      "ended_at": "2026-07-29T08:00:03+00:00",
+      "duration_ms": 320,
+      "modality": "cli",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "narrative",
+      "interaction": {
+        "target": "git branch -a on IGNITE monorepo",
+        "method": null,
+        "request": {"url": null, "headers": null, "params": null, "body": null},
+        "response": {"status_code": null, "headers": null, "body_summary": "3 local branches, 2 remote. Current: schema-v0.2-batch1 (unpushed)", "body_schema": null, "error": null}
+      },
+      "observation": {
+        "what_happened": "Three local branches, two remote. Current branch schema-v0.2-batch1 has no remote tracking — exists only locally.",
+        "what_learned": "Branch topology is a CLI-specific signal. An operator agent seeing this knows schema-v0.2-batch1 is unpushed — risk of work loss.",
+        "confidence": "high",
+        "surprises": "The unpushed branch signal is proactive intelligence an operator could act on.",
+        "questions_raised": []
+      },
+      "state": {"preconditions": [], "postconditions": [], "state_changes": []},
+      "relationships": {"depends_on": ["cli-001"], "enables": ["cli-003"], "contradicts": [], "refines": []},
+      "tags": ["git", "branch"],
+      "metadata": {},
+      "modality_ext": {
+        "type": "cli_ext",
+        "command": "git",
+        "subcommand": "branch -a",
+        "args": ["-a"],
+        "exit_code": 0,
+        "working_dir": "REPOS/ignite",
+        "shell": "zsh"
+      }
+    },
+    {
+      "span_id": "cli-003",
+      "trace_id": "trace-cli-session-006",
+      "sequence": 3,
+      "kind": "workflow_trace",
+      "started_at": "2026-07-29T08:00:05+00:00",
+      "ended_at": "2026-07-29T08:00:07+00:00",
+      "duration_ms": 1360,
+      "modality": "cli",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "narrative",
+      "interaction": {
+        "target": "pytest run — full test suite",
+        "method": null,
+        "request": {"url": null, "headers": null, "params": null, "body": null},
+        "response": {"status_code": null, "headers": null, "body_summary": "395 tests passed, 0 failed, 0 skipped in 1.36s", "body_schema": null, "error": null}
+      },
+      "observation": {
+        "what_happened": "395 tests pass in 1.36s across both packages (parser + trace-sdk). Zero failures.",
+        "what_learned": "Test execution has extremely high intelligence density. Running tests AFTER seeing uncommitted changes tells the operator the uncommitted work is validated. Cross-span correlation compounds intelligence.",
+        "confidence": "high",
+        "surprises": "395 tests — up from 177 two days ago. Growth rate is itself a velocity signal.",
+        "questions_raised": ["Should cli_ext capture test-level detail or just summary?"]
+      },
+      "state": {"preconditions": ["working_tree_dirty"], "postconditions": ["tests_green"], "state_changes": []},
+      "relationships": {"depends_on": ["cli-001"], "enables": ["cli-004"], "contradicts": [], "refines": []},
+      "tags": ["pytest", "testing"],
+      "metadata": {},
+      "modality_ext": {
+        "type": "cli_ext",
+        "command": "python",
+        "subcommand": "-m pytest",
+        "args": ["packages/parser/tests", "packages/trace-sdk/tests", "-v", "--tb=short"],
+        "exit_code": 0,
+        "working_dir": "REPOS/ignite",
+        "shell": "zsh"
+      }
+    },
+    {
+      "span_id": "cli-004",
+      "trace_id": "trace-cli-session-006",
+      "sequence": 4,
+      "kind": "workflow_trace",
+      "started_at": "2026-07-29T08:01:00+00:00",
+      "ended_at": "2026-07-29T08:02:00+00:00",
+      "duration_ms": 2400,
+      "modality": "cli",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "narrative",
+      "contains_contexts": [
+        {"modality": "api", "relationship": "processes", "active": true, "description": "Pipeline reads and classifies Plaid API trace files"}
+      ],
+      "interaction": {
+        "target": "ignite-parse ops — pipeline execution",
+        "method": null,
+        "request": {"url": null, "headers": null, "params": null, "body": null},
+        "response": {"status_code": null, "headers": null, "body_summary": "Pipeline converged in 2 iterations. 10 actions planned, 10 executed, 10 succeeded. Accuracy 1.0.", "body_schema": null, "error": null}
+      },
+      "observation": {
+        "what_happened": "Pipeline converged in 2 iterations under the 3-iteration limit. 10 actions planned, 10 executed, 10 succeeded. Generated 5 FSM models, 1 error handler, 1 typed API client, 3 exploration directives.",
+        "what_learned": "This is the most intelligence-dense CLI interaction: a single command triggers a multi-stage pipeline and produces structured output AND generated artifacts. The CLI trace captures the entire BCI loop in one span.",
+        "confidence": "high",
+        "surprises": "The pipeline itself is a CLI tool — CLI tracing captures IGNITE operating itself. Self-referential.",
+        "questions_raised": ["Should it carry dual modality tags (cli + internal)?"]
+      },
+      "state": {"preconditions": ["tests_green"], "postconditions": ["pipeline_converged"], "state_changes": []},
+      "relationships": {"depends_on": ["cli-003"], "enables": ["cli-005"], "contradicts": [], "refines": []},
+      "tags": ["pipeline", "ops"],
+      "metadata": {},
+      "modality_ext": {
+        "type": "cli_ext",
+        "command": "ignite-parse",
+        "subcommand": "ops",
+        "args": ["--traces-dir", "traces/", "--max-iterations", "3", "--format", "json"],
+        "exit_code": 0,
+        "working_dir": "REPOS/ignite",
+        "shell": "zsh"
+      }
+    },
+    {
+      "span_id": "cli-005",
+      "trace_id": "trace-cli-session-006",
+      "sequence": 5,
+      "kind": "workflow_trace",
+      "started_at": "2026-07-29T08:03:00+00:00",
+      "ended_at": "2026-07-29T08:03:01+00:00",
+      "duration_ms": 280,
+      "modality": "cli",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "narrative",
+      "interaction": {
+        "target": "git diff --stat — change impact assessment",
+        "method": null,
+        "request": {"url": null, "headers": null, "params": null, "body": null},
+        "response": {"status_code": null, "headers": null, "body_summary": "608 insertions, 23 deletions across 12 files. Net +585 lines.", "body_schema": null, "error": null}
+      },
+      "observation": {
+        "what_happened": "608 insertions, 23 deletions across 12 files in both packages. Net +585 lines.",
+        "what_learned": "The CLI session as a whole tells a story no individual command captures. The SEQUENCE of commands is the intelligence. An operator could recommend: commit and push — the risk is low.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {"preconditions": ["pipeline_converged"], "postconditions": [], "state_changes": []},
+      "relationships": {"depends_on": ["cli-004"], "enables": [], "contradicts": [], "refines": []},
+      "tags": ["git", "diff"],
+      "metadata": {},
+      "modality_ext": {
+        "type": "cli_ext",
+        "command": "git",
+        "subcommand": "diff --stat",
+        "args": ["--stat"],
+        "exit_code": 0,
+        "working_dir": "REPOS/ignite",
+        "shell": "zsh"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "F-006-01",
+      "trace_id": "trace-cli-session-006",
+      "source_spans": ["cli-001", "cli-002", "cli-003", "cli-004", "cli-005"],
+      "category": "trace_surface",
+      "title": "CLI sessions have narrative structure",
+      "description": "CLI sessions have NARRATIVE STRUCTURE that API traces lack. The sequence git-status→branch→test→pipeline→diff tells a coherent story. An operator agent needs session-level intent, not just individual command intent.",
+      "evidence": ["5-span narrative arc: assess→verify→execute→measure"],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": ["cli", "narrative"],
+      "metadata": {}
+    },
+    {
+      "finding_id": "F-006-02",
+      "trace_id": "trace-cli-session-006",
+      "source_spans": ["cli-004"],
+      "category": "cross_modality",
+      "title": "CLI wraps other modalities — cross-modality nesting",
+      "description": "The ignite-parse CLI command internally processes API traces. CLI→API modality nesting is universal and needs contains_contexts to capture the relationship.",
+      "evidence": ["cli-004 processes Plaid API trace files through BCI pipeline"],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": ["cross-modality", "nesting"],
+      "metadata": {}
+    },
+    {
+      "finding_id": "F-006-03",
+      "trace_id": "trace-cli-session-006",
+      "source_spans": ["cli-003"],
+      "category": "intelligence",
+      "title": "CLI has highest intelligence density per span",
+      "description": "CLI traces are 3x denser than API per span. A single pytest span captures 395 test results. CLI commands aggregate many underlying operations.",
+      "evidence": ["pytest span: 395 tests in one observation", "pipeline span: full BCI loop in one command"],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": ["intelligence-density"],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}

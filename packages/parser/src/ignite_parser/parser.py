@@ -14,26 +14,37 @@ from typing import Any
 
 from ignite_parser.models import (
     Actionability,
+    ActualOutcome,
     AgentRole,
     Confidence,
+    ContainsContext,
+    DeltaFromPrior,
+    ExpectedOutcome,
     Finding,
     FindingCategory,
     FindingConfidence,
     Interaction,
+    Modality,
     Observation,
     ParseResult,
     Relationships,
     Request,
+    RequestIntent,
     Response,
+    ResponseOutcome,
+    SessionIntent,
+    SignalClass,
     Span,
     SpanKind,
+    SpanStructure,
     State,
+    StateTransitionSubtype,
     Trace,
     TraceStatus,
     ValidationError,
 )
 
-SUPPORTED_VERSIONS = {"0.1"}
+SUPPORTED_VERSIONS = {"0.1", "0.2"}
 
 # Patterns that suggest unsanitized secrets
 SECRET_PATTERNS = [
@@ -110,6 +121,11 @@ def parse_trace(data: dict[str, Any], source: str = "<input>") -> ParseResult:
     if errors:
         return ParseResult(errors=errors, warnings=warnings)
 
+    # Schema v13: session_intent (optional)
+    session_intent = _parse_enum_optional(
+        data.get("session_intent"), SessionIntent, "session_intent", warnings, default=None
+    )
+
     trace = Trace(
         schema_version=version,
         trace_id=data["trace_id"],
@@ -126,6 +142,7 @@ def parse_trace(data: dict[str, Any], source: str = "<input>") -> ParseResult:
         spans=spans,
         findings=findings,
         metadata=data.get("metadata", {}),
+        session_intent=session_intent,
     )
 
     return ParseResult(traces=[trace], warnings=warnings)
@@ -185,6 +202,18 @@ def _parse_enum(value: Any, enum_cls: type, path: str, errors: list[ValidationEr
         return None
 
 
+def _parse_enum_optional(value: Any, enum_cls: type, path: str, warnings: list[ValidationError], default=None):
+    """Parse a string into an enum, using a default if missing. Warns on invalid values."""
+    if value is None:
+        return default
+    try:
+        return enum_cls(value)
+    except ValueError:
+        valid = [e.value for e in enum_cls]
+        warnings.append(ValidationError(path, f"invalid value '{value}', expected one of {valid}; using default"))
+        return default
+
+
 def _parse_timestamp(value: Any, path: str, errors: list[ValidationError], required: bool = True) -> datetime | None:
     """Parse an ISO-8601 timestamp string."""
     if not value:
@@ -242,6 +271,105 @@ def _parse_span(data: dict[str, Any], path: str) -> tuple[Span | None, list[Vali
     state_data = data.get("state", {})
     rel_data = data.get("relationships", {})
 
+    # v0.2 classification fields (optional, with defaults for v0.1 compat)
+    modality = _parse_enum_optional(
+        data.get("modality"), Modality, f"{path}.modality", warnings, default=Modality.API
+    )
+    request_intent = _parse_enum_optional(
+        data.get("request_intent"), RequestIntent, f"{path}.request_intent", warnings, default=RequestIntent.QUERY
+    )
+    response_outcome = _parse_enum_optional(
+        data.get("response_outcome"), ResponseOutcome, f"{path}.response_outcome", warnings, default=ResponseOutcome.SUCCESS
+    )
+    signal_class = _parse_enum_optional(
+        data.get("signal_class"), SignalClass, f"{path}.signal_class", warnings, default=SignalClass.INTENT_CARRYING
+    )
+    delta_from_prior = _parse_enum_optional(
+        data.get("delta_from_prior"), DeltaFromPrior, f"{path}.delta_from_prior", warnings, default=DeltaFromPrior.FULL
+    )
+    state_transition_subtype = None
+    raw_subtype = data.get("state_transition_subtype")
+    if raw_subtype is not None:
+        state_transition_subtype = _parse_enum_optional(
+            raw_subtype, StateTransitionSubtype, f"{path}.state_transition_subtype", warnings, default=None
+        )
+
+    # v0.2 feedback divergence fields (optional, null defaults)
+    expected_outcome = None
+    raw_expected = data.get("expected_outcome")
+    if raw_expected is not None and isinstance(raw_expected, dict):
+        expected_outcome = ExpectedOutcome(
+            description=raw_expected.get("description", ""),
+            confidence=float(raw_expected.get("confidence", 0.0)),
+        )
+
+    actual_outcome = None
+    raw_actual = data.get("actual_outcome")
+    if raw_actual is not None and isinstance(raw_actual, dict):
+        actual_outcome = ActualOutcome(
+            description=raw_actual.get("description", ""),
+        )
+
+    divergence_score = data.get("divergence_score")
+    if divergence_score is not None:
+        try:
+            divergence_score = float(divergence_score)
+        except (ValueError, TypeError):
+            warnings.append(ValidationError(
+                f"{path}.divergence_score",
+                f"invalid divergence_score '{divergence_score}', expected float; ignoring"
+            ))
+            divergence_score = None
+
+    # v0.2 modality extension (pass through as dict — typed on SDK side)
+    modality_ext = data.get("modality_ext")
+    if modality_ext is not None and not isinstance(modality_ext, dict):
+        warnings.append(ValidationError(
+            f"{path}.modality_ext",
+            f"modality_ext must be an object; ignoring"
+        ))
+        modality_ext = None
+
+    # Schema v13 fields
+    span_structure = _parse_enum_optional(
+        data.get("span_structure"), SpanStructure, f"{path}.span_structure", warnings, default=None
+    )
+
+    contains_contexts: list[ContainsContext] = []
+    raw_contexts = data.get("contains_contexts")
+    if raw_contexts is not None:
+        if isinstance(raw_contexts, list):
+            for j, ctx in enumerate(raw_contexts):
+                if isinstance(ctx, dict):
+                    contains_contexts.append(ContainsContext(
+                        modality=ctx.get("modality", ""),
+                        relationship=ctx.get("relationship", ""),
+                        active=ctx.get("active", True),
+                        context_id=ctx.get("context_id"),
+                        description=ctx.get("description"),
+                    ))
+                else:
+                    warnings.append(ValidationError(
+                        f"{path}.contains_contexts[{j}]",
+                        "contains_contexts entry must be an object; skipping"
+                    ))
+        else:
+            warnings.append(ValidationError(
+                f"{path}.contains_contexts",
+                "contains_contexts must be an array; ignoring"
+            ))
+
+    compression_ratio = data.get("compression_ratio")
+    if compression_ratio is not None:
+        try:
+            compression_ratio = float(compression_ratio)
+        except (ValueError, TypeError):
+            warnings.append(ValidationError(
+                f"{path}.compression_ratio",
+                f"invalid compression_ratio '{compression_ratio}', expected float; ignoring"
+            ))
+            compression_ratio = None
+
     span = Span(
         span_id=span_id,
         trace_id=data.get("trace_id", ""),
@@ -288,6 +416,20 @@ def _parse_span(data: dict[str, Any], path: str) -> tuple[Span | None, list[Vali
         ),
         tags=data.get("tags", []),
         metadata=data.get("metadata", {}),
+        modality=modality,
+        request_intent=request_intent,
+        response_outcome=response_outcome,
+        signal_class=signal_class,
+        delta_from_prior=delta_from_prior,
+        state_transition_subtype=state_transition_subtype,
+        correlation_ids=data.get("correlation_ids", []),
+        expected_outcome=expected_outcome,
+        actual_outcome=actual_outcome,
+        divergence_score=divergence_score,
+        modality_ext=modality_ext,
+        span_structure=span_structure,
+        contains_contexts=contains_contexts,
+        compression_ratio=compression_ratio,
     )
 
     return span, errors, warnings
