@@ -54,6 +54,9 @@ class CliExt:
     working_dir: str | None = None      # Working directory
     shell: str | None = None            # e.g., "bash", "zsh", "powershell"
     duration_ms: int | None = None      # Command execution time
+    pipe_chain: list[str] | None = None  # Individual commands in a pipe
+    signal: int | None = None            # Signal number if killed (from exit code 128+N)
+    env_subset: dict[str, str] | None = None  # Non-secret env vars (PATH, NODE_ENV)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"type": "cli_ext"}
@@ -77,6 +80,12 @@ class CliExt:
             d["shell"] = self.shell
         if self.duration_ms is not None:
             d["duration_ms"] = self.duration_ms
+        if self.pipe_chain is not None:
+            d["pipe_chain"] = self.pipe_chain
+        if self.signal is not None:
+            d["signal"] = self.signal
+        if self.env_subset is not None:
+            d["env_subset"] = self.env_subset
         return d
 
     @classmethod
@@ -92,4 +101,7 @@ class CliExt:
             working_dir=data.get("working_dir"),
             shell=data.get("shell"),
             duration_ms=data.get("duration_ms"),
+            pipe_chain=data.get("pipe_chain"),
+            signal=data.get("signal"),
+            env_subset=data.get("env_subset"),
         )

@@ -18,7 +18,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "trace-sdk" / "src"
 from ignite_parser.parser import parse_trace
 from ignite_parser.analyzer import analyze
 from ignite_parser.optimizer import optimize
+from ignite_parser.planner import plan, ActionKind
+from ignite_parser.executor import execute, ActionStatus
+from ignite_parser.feedback import lookup_correction, capture_feedback
 from ignite_parser.models import (
+    CorrectionAction,
     Modality,
     RequestIntent,
     ResponseOutcome,
@@ -55,8 +59,8 @@ def optimized_result(analysis_result):
 
 
 class TestCliParserE2E:
-    def test_parses_all_7_spans(self, parsed_trace):
-        assert len(parsed_trace.spans) == 7
+    def test_parses_all_8_spans(self, parsed_trace):
+        assert len(parsed_trace.spans) == 8
 
     def test_all_spans_modality_cli(self, parsed_trace):
         for span in parsed_trace.spans:
@@ -66,6 +70,7 @@ class TestCliParserE2E:
         for span in parsed_trace.spans:
             assert span.modality_ext is not None
             assert span.modality_ext["type"] == "cli_ext"
+            assert "command" in span.modality_ext
 
     def test_cli_ext_command_line(self, parsed_trace):
         """P0 field: command_line flows through Parser."""
@@ -76,41 +81,57 @@ class TestCliParserE2E:
     def test_exit_codes(self, parsed_trace):
         codes = {s.span_id: s.modality_ext.get("exit_code") for s in parsed_trace.spans}
         assert codes["cli-span-001"] == 0   # git status
-        assert codes["cli-span-003"] == 1   # pytest failure
-        assert codes["cli-span-004"] == 0   # pytest retry
+        assert codes["cli-span-004"] == 1   # npm run test (failure)
+        assert codes["cli-span-008"] == 0   # npm run test (retry)
 
     def test_intent_classification(self, parsed_trace):
         intents = {s.span_id: s.request_intent for s in parsed_trace.spans}
-        assert intents["cli-span-001"] == RequestIntent.QUERY           # git status
-        assert intents["cli-span-002"] == RequestIntent.STATE_TRANSITION  # make build
-        assert intents["cli-span-003"] == RequestIntent.QUERY           # pytest (read)
-        assert intents["cli-span-005"] == RequestIntent.MUTATION        # git commit
-        assert intents["cli-span-006"] == RequestIntent.MUTATION        # git push
+        assert intents["cli-span-001"] == RequestIntent.QUERY            # git status
+        assert intents["cli-span-002"] == RequestIntent.MUTATION         # npm install
+        assert intents["cli-span-003"] == RequestIntent.STATE_TRANSITION # npm run build
+        assert intents["cli-span-004"] == RequestIntent.STATE_TRANSITION # npm run test (fail)
+        assert intents["cli-span-005"] == RequestIntent.QUERY            # cat
+        assert intents["cli-span-006"] == RequestIntent.QUERY            # grep
+        assert intents["cli-span-007"] == RequestIntent.MUTATION         # git commit
+        assert intents["cli-span-008"] == RequestIntent.STATE_TRANSITION # npm run test (pass)
 
     def test_error_span(self, parsed_trace):
-        span3 = next(s for s in parsed_trace.spans if s.span_id == "cli-span-003")
-        assert span3.response_outcome == ResponseOutcome.ERROR
-        assert span3.divergence_score == 0.3
+        span4 = next(s for s in parsed_trace.spans if s.span_id == "cli-span-004")
+        assert span4.response_outcome == ResponseOutcome.ERROR
+        assert span4.divergence_score == 0.7
 
-    def test_span_structure_narrative(self, parsed_trace):
+    def test_retry_span_success(self, parsed_trace):
+        span8 = next(s for s in parsed_trace.spans if s.span_id == "cli-span-008")
+        assert span8.response_outcome == ResponseOutcome.SUCCESS
+
+    def test_span_structure_transactional(self, parsed_trace):
         for span in parsed_trace.spans:
-            assert span.span_structure == SpanStructure.NARRATIVE
+            assert span.span_structure == SpanStructure.TRANSACTIONAL
 
-    def test_cross_modality_context(self, parsed_trace):
-        span6 = next(s for s in parsed_trace.spans if s.span_id == "cli-span-006")
-        assert len(span6.contains_contexts) == 1
-        assert span6.contains_contexts[0].modality == "api"
-        assert span6.contains_contexts[0].relationship == "triggers"
+    def test_cross_modality_build_api(self, parsed_trace):
+        """Build span triggers API calls to package registry."""
+        span3 = next(s for s in parsed_trace.spans if s.span_id == "cli-span-003")
+        assert len(span3.contains_contexts) == 1
+        assert span3.contains_contexts[0].modality == "api"
+        assert span3.contains_contexts[0].relationship == "triggers"
+
+    def test_cross_modality_commit_db(self, parsed_trace):
+        """Git commit writes to .git database."""
+        span7 = next(s for s in parsed_trace.spans if s.span_id == "cli-span-007")
+        assert len(span7.contains_contexts) == 1
+        assert span7.contains_contexts[0].modality == "db"
+        assert span7.contains_contexts[0].relationship == "writes_to"
 
     def test_session_intent(self, parsed_trace):
-        assert parsed_trace.session_intent.value == "deployment"
+        assert parsed_trace.session_intent.value == "validation"
 
     def test_findings_parsed(self, parsed_trace):
-        assert len(parsed_trace.findings) == 2
+        assert len(parsed_trace.findings) == 3
 
     def test_no_parse_errors(self, cli_trace_data):
         result = parse_trace(cli_trace_data)
         assert result.ok
+        assert result.error_count == 0
 
 
 # --- Analyzer E2E ---
@@ -120,12 +141,13 @@ class TestCliAnalyzerE2E:
     def test_modality_profile_cli(self, analysis_result):
         assert "cli" in analysis_result.modality_profiles
         profile = analysis_result.modality_profiles["cli"]
-        assert profile.span_count == 7
+        assert profile.span_count == 8
+        assert profile.total_duration_ms == 500 + 30000 + 30000 + 15000 + 200 + 500 + 300 + 15000
 
     def test_success_and_error_rates(self, analysis_result):
         profile = analysis_result.modality_profiles["cli"]
-        assert profile.success_rate == pytest.approx(6 / 7, abs=0.01)
-        assert profile.error_rate == pytest.approx(1 / 7, abs=0.01)
+        assert profile.success_rate == pytest.approx(7 / 8, abs=0.01)
+        assert profile.error_rate == pytest.approx(1 / 8, abs=0.01)
 
     def test_no_other_modality_profiles(self, analysis_result):
         assert "api" not in analysis_result.modality_profiles
@@ -136,7 +158,10 @@ class TestCliAnalyzerE2E:
         assert len(analysis_result.endpoints) > 0
 
     def test_dependency_graph(self, analysis_result):
-        assert len(analysis_result.graph.nodes) >= 7
+        assert len(analysis_result.graph.nodes) >= 8
+
+    def test_finding_clusters(self, analysis_result):
+        assert len(analysis_result.finding_clusters) == 3
 
     def test_coverage_modalities(self, analysis_result):
         assert "cli" in analysis_result.coverage.modalities_seen
@@ -147,10 +172,11 @@ class TestCliAnalyzerE2E:
 
 class TestCliOptimizerE2E:
     def test_merged_findings(self, optimized_result):
-        assert optimized_result.finding_count == 2
+        assert optimized_result.finding_count == 3
 
     def test_coverage(self, optimized_result):
-        assert optimized_result.coverage.total_spans == 7
+        assert optimized_result.coverage.total_spans == 8
+        assert optimized_result.coverage.total_traces == 1
 
 
 # --- All four modalities together ---
@@ -209,5 +235,143 @@ class TestAllFourModalities:
         # Optimize all together
         opt = optimize(analyses)
         assert opt.source_analysis_count == 4
-        assert opt.coverage.total_spans == 7 + 7 + 7 + 1  # cli + db + web + api
+        assert opt.coverage.total_spans == 8 + 7 + 7 + 1  # cli + db + web + api
         assert opt.coverage.total_traces == 4
+
+
+# --- Planner E2E ---
+
+
+class TestCliPlannerE2E:
+    def test_plan_generated_from_cli_findings(self, optimized_result):
+        execution_plan = plan(optimized_result)
+        assert execution_plan.action_count > 0
+
+    def test_error_handler_from_test_failure(self, optimized_result):
+        execution_plan = plan(optimized_result)
+        handlers = execution_plan.actions_by_kind(ActionKind.GENERATE_HANDLER)
+        assert len(handlers) >= 1
+
+    def test_plan_has_source_counts(self, optimized_result):
+        execution_plan = plan(optimized_result)
+        assert execution_plan.source_finding_count == optimized_result.finding_count
+
+
+# --- Executor E2E ---
+
+
+class TestCliExecutorE2E:
+    def test_executor_runs_plan(self, optimized_result, tmp_path):
+        execution_plan = plan(optimized_result)
+        result = execute(execution_plan, optimized_result, output_dir=tmp_path)
+        assert result.total == execution_plan.action_count
+        assert result.total > 0
+
+    def test_executor_produces_artifacts(self, optimized_result, tmp_path):
+        execution_plan = plan(optimized_result)
+        result = execute(execution_plan, optimized_result, output_dir=tmp_path)
+        succeeded = result.by_status(ActionStatus.SUCCESS)
+        generated_files = []
+        for ar in succeeded:
+            generated_files.extend(ar.generated_files)
+        assert len(generated_files) > 0
+
+
+# --- Feedback E2E ---
+
+
+class TestCliFeedbackE2E:
+    def test_feedback_captures_cli_execution(self, optimized_result, tmp_path):
+        execution_plan = plan(optimized_result)
+        result = execute(execution_plan, optimized_result, output_dir=tmp_path)
+        feedback_path = capture_feedback(execution_plan, result, output_dir=tmp_path)
+        assert feedback_path is not None
+        assert feedback_path.exists()
+
+    def test_feedback_trace_parseable(self, optimized_result, tmp_path):
+        execution_plan = plan(optimized_result)
+        result = execute(execution_plan, optimized_result, output_dir=tmp_path)
+        feedback_path = capture_feedback(execution_plan, result, output_dir=tmp_path)
+        assert feedback_path is not None
+        feedback_data = json.loads(feedback_path.read_text(encoding="utf-8"))
+        re_parsed = parse_trace(feedback_data)
+        assert re_parsed.ok, f"Feedback re-parse errors: {[e.message for e in re_parsed.errors]}"
+
+
+# --- CLI ErrP integration ---
+
+
+class TestCliErrPIntegration:
+    """Verify CLI error codes flow through lookup_correction via the CLI profile."""
+
+    def test_command_not_found_escalate(self):
+        correction = lookup_correction("query", "error", error_code="command_not_found")
+        assert correction == CorrectionAction.ESCALATE_HUMAN
+
+    def test_timeout_backoff_retry(self):
+        correction = lookup_correction("state_transition", "error", error_code="timeout")
+        assert correction == CorrectionAction.BACKOFF_RETRY
+
+    def test_oom_killed_log_escalate(self):
+        """OOM kill (exit 137) — log and escalate, not safe to auto-retry."""
+        correction = lookup_correction("state_transition", "error", error_code="oom_killed")
+        assert correction == CorrectionAction.LOG_ESCALATE
+
+    def test_general_error_backoff(self):
+        correction = lookup_correction("mutation", "error", error_code="general_error")
+        assert correction == CorrectionAction.BACKOFF_RETRY
+
+    def test_test_failure_escalate(self):
+        """Test failure must NOT be retried — fix the code, not the run."""
+        correction = lookup_correction("state_transition", "error", error_code="test_failure")
+        assert correction == CorrectionAction.ESCALATE_HUMAN
+
+    def test_unknown_cli_error_falls_through_to_table(self):
+        correction = lookup_correction("query", "error", error_code="some_unknown_cli_error")
+        assert correction == CorrectionAction.BACKOFF_RETRY
+
+    def test_success_still_returns_none(self):
+        correction = lookup_correction("query", "success", error_code="command_not_found")
+        assert correction is None
+
+
+# --- Full E2E pipeline (acid test) ---
+
+
+class TestFullCliPipeline:
+    """The acid test: CLI trace flows through ALL 6 stages using the SAME code paths."""
+
+    def test_full_pipeline_e2e(self, cli_trace_data, tmp_path):
+        """Parse -> Analyze -> Optimize -> Plan -> Execute -> Feedback, all from a CLI trace."""
+        # Stage 1: Parser
+        parsed = parse_trace(cli_trace_data)
+        assert parsed.ok
+        assert all(s.modality == Modality.CLI for s in parsed.traces[0].spans)
+
+        # Stage 2: Analyzer
+        analysis = analyze(parsed.traces)
+        assert "cli" in analysis.modality_profiles
+        assert analysis.modality_profiles["cli"].span_count == 8
+
+        # Stage 3: Optimizer
+        optimized = optimize([analysis])
+        assert optimized.finding_count == 3
+        assert optimized.coverage.total_spans == 8
+
+        # Stage 4: Planner
+        execution_plan = plan(optimized)
+        assert execution_plan.action_count > 0
+
+        # Stage 5: Executor
+        result = execute(execution_plan, optimized, output_dir=tmp_path)
+        assert result.total > 0
+        assert result.succeeded > 0
+
+        # Stage 6: Feedback
+        feedback_path = capture_feedback(execution_plan, result, output_dir=tmp_path)
+        assert feedback_path is not None
+
+        # Close the loop: feedback trace re-enters Parser
+        feedback_data = json.loads(feedback_path.read_text(encoding="utf-8"))
+        re_parsed = parse_trace(feedback_data)
+        assert re_parsed.ok

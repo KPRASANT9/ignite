@@ -47,6 +47,9 @@ class TestCliErrorTaxonomy:
     def test_unknown_code_returns_none(self):
         assert lookup_cli_errp_override("unknown") is None
 
+    def test_total_error_codes(self):
+        assert len(CLI_ERROR_CODES) >= 10
+
 
 # --- Exit code mapping ---
 
@@ -104,6 +107,12 @@ class TestCliIntentClassification:
 
     def test_kubectl_delete_is_mutation(self):
         assert classify_cli_intent("kubectl", "delete") == "mutation"
+
+    def test_npm_run_is_state_transition(self):
+        assert classify_cli_intent("npm", "run") == "state_transition"
+
+    def test_npm_install_is_mutation(self):
+        assert classify_cli_intent("npm", "install") == "mutation"
 
     def test_default_is_query(self):
         assert classify_cli_intent("some_unknown_tool") == "query"
@@ -169,6 +178,11 @@ class TestCliSecretScrubbing:
         result = scrub_cli_secrets("mysql -u root -p mysecret")
         assert "mysecret" not in result
 
+    def test_scrub_multiple_secrets(self):
+        result = scrub_cli_secrets("app --password=abc --token=def")
+        assert "abc" not in result
+        assert "def" not in result
+
 
 # --- Sanitizer integration ---
 
@@ -210,3 +224,47 @@ class TestCliExtEnhanced:
         d = ext.to_dict()
         assert "s3cret123" not in d["command_line"]
         assert "--password=***" in d["command_line"]
+
+    def test_pipe_chain_roundtrip(self):
+        ext = CliExt(
+            command="cat",
+            command_line="cat file.txt | grep pattern | wc -l",
+            exit_code=0,
+            pipe_chain=["cat file.txt", "grep pattern", "wc -l"],
+        )
+        d = ext.to_dict()
+        assert d["pipe_chain"] == ["cat file.txt", "grep pattern", "wc -l"]
+        restored = CliExt.from_dict(d)
+        assert restored.pipe_chain == ["cat file.txt", "grep pattern", "wc -l"]
+
+    def test_pipe_chain_omitted_when_none(self):
+        ext = CliExt(command="ls")
+        d = ext.to_dict()
+        assert "pipe_chain" not in d
+
+    def test_signal_roundtrip(self):
+        ext = CliExt(command="long_running", exit_code=137, signal=9)
+        d = ext.to_dict()
+        assert d["signal"] == 9
+        restored = CliExt.from_dict(d)
+        assert restored.signal == 9
+
+    def test_signal_omitted_when_none(self):
+        ext = CliExt(command="ls", exit_code=0)
+        d = ext.to_dict()
+        assert "signal" not in d
+
+    def test_env_subset_roundtrip(self):
+        ext = CliExt(
+            command="node",
+            env_subset={"NODE_ENV": "production", "PATH": "/usr/bin"},
+        )
+        d = ext.to_dict()
+        assert d["env_subset"] == {"NODE_ENV": "production", "PATH": "/usr/bin"}
+        restored = CliExt.from_dict(d)
+        assert restored.env_subset == {"NODE_ENV": "production", "PATH": "/usr/bin"}
+
+    def test_env_subset_omitted_when_none(self):
+        ext = CliExt(command="ls")
+        d = ext.to_dict()
+        assert "env_subset" not in d
