@@ -94,6 +94,17 @@ def sanitize_web_input(
     return value
 
 
+def sanitize_cli_command(command_line: str) -> str:
+    """Scrub inline secrets from a CLI command string (P0 privacy requirement).
+
+    Delegates to cli_ext.scrub_cli_secrets() for pattern matching.
+    Also applies general secret pattern scrubbing.
+    """
+    from ignite_trace.extensions.cli_ext import scrub_cli_secrets
+    result = scrub_cli_secrets(command_line)
+    return sanitize_string(result)
+
+
 def truncate_body(body_summary: str, max_length: int = MAX_BODY_LENGTH) -> str:
     """Truncate body summaries that exceed max length."""
     if len(body_summary) <= max_length:

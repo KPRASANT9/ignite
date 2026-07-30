@@ -87,6 +87,15 @@ def _load_web_override(error_code: str) -> str | None:
         return None
 
 
+def _load_cli_override(error_code: str) -> str | None:
+    """Try to load CLI profile's ErrP override for an error code."""
+    try:
+        from ignite_trace.profiles.cli import lookup_cli_errp_override
+        return lookup_cli_errp_override(error_code)
+    except ImportError:
+        return None
+
+
 def lookup_correction(
     request_intent: str,
     response_outcome: str,
@@ -106,7 +115,7 @@ def lookup_correction(
     # P0: Error-code-level override — takes precedence over intent-class default
     # Check all available profiles (Plaid API, DB, etc.) for error code overrides
     if error_code is not None:
-        for _profile_loader in (_load_plaid_override, _load_db_override, _load_web_override):
+        for _profile_loader in (_load_plaid_override, _load_db_override, _load_web_override, _load_cli_override):
             override = _profile_loader(error_code)
             if override is not None:
                 return CorrectionAction(override)
