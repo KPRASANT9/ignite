@@ -1,0 +1,475 @@
+{
+  "schema_version": "0.2",
+  "trace_id": "trace-web-session-001",
+  "agent_id": "WebExplorer",
+  "agent_role": "explorer",
+  "system": "ignite",
+  "study_channel": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "session_id": "web-sess-001",
+  "started_at": "2026-07-30T00:00:00Z",
+  "ended_at": "2026-07-30T00:05:00Z",
+  "status": "completed",
+  "objective": "Validate Web modality flows through universal pipeline without modality-specific code paths",
+  "session_intent": "validation",
+  "findings_summary": "Web traces flow through Parser, Analyzer, and Optimizer using the same universal code paths as API and DB traces.",
+  "spans": [
+    {
+      "span_id": "web-span-001",
+      "trace_id": "trace-web-session-001",
+      "sequence": 1,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:00Z",
+      "ended_at": "2026-07-30T00:00:01Z",
+      "duration_ms": 850,
+      "modality": "web",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "transactional",
+      "interaction": {
+        "target": "navigate /login",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Login page loaded with username and password fields"
+        }
+      },
+      "observation": {
+        "what_happened": "Navigated to login page. AXTree shows form with username textbox, password textbox, and Sign In button.",
+        "what_learned": "Login page loads in 850ms. Standard credential-based auth flow.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Browser launched"],
+        "postconditions": ["Login page rendered"],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": ["web-span-002"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "navigation", "login"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/login",
+        "page_title": "Plaid Dashboard - Login",
+        "action": "navigate",
+        "element_role": "link",
+        "snapshot_hash": "a1b2c3d4e5f6"
+      }
+    },
+    {
+      "span_id": "web-span-002",
+      "trace_id": "trace-web-session-001",
+      "sequence": 2,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:01Z",
+      "ended_at": "2026-07-30T00:00:02Z",
+      "duration_ms": 120,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "partial",
+      "span_structure": "transactional",
+      "interaction": {
+        "target": "type username",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Username field populated"
+        }
+      },
+      "observation": {
+        "what_happened": "Typed username into the email textbox field.",
+        "what_learned": "Input accepted, field validates email format on blur.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Login page loaded"],
+        "postconditions": ["Username entered"],
+        "state_changes": ["username field populated"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-001"],
+        "enables": ["web-span-003"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "interaction", "input"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/login",
+        "page_title": "Plaid Dashboard - Login",
+        "action": "type",
+        "element_role": "textbox",
+        "element_name": "Email",
+        "selector": "#email-input",
+        "input_value": "user@example.com",
+        "input_type": "email",
+        "snapshot_hash": "b2c3d4e5f6a1",
+        "delta_from": "web-span-001"
+      }
+    },
+    {
+      "span_id": "web-span-003",
+      "trace_id": "trace-web-session-001",
+      "sequence": 3,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:02Z",
+      "ended_at": "2026-07-30T00:00:03Z",
+      "duration_ms": 80,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "partial",
+      "span_structure": "transactional",
+      "interaction": {
+        "target": "type password",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Password field populated (masked)"
+        }
+      },
+      "observation": {
+        "what_happened": "Typed password into the password field. Value masked by privacy filter.",
+        "what_learned": "Password field accepts input. Privacy masking applied correctly — input_value shows '***'.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Username entered"],
+        "postconditions": ["Password entered"],
+        "state_changes": ["password field populated"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-002"],
+        "enables": ["web-span-004"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "interaction", "input", "sensitive"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/login",
+        "page_title": "Plaid Dashboard - Login",
+        "action": "type",
+        "element_role": "textbox",
+        "element_name": "Password",
+        "selector": "#password-input",
+        "input_value": "***",
+        "input_type": "password",
+        "snapshot_hash": "c3d4e5f6a1b2",
+        "delta_from": "web-span-002"
+      }
+    },
+    {
+      "span_id": "web-span-004",
+      "trace_id": "trace-web-session-001",
+      "sequence": 4,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:03Z",
+      "ended_at": "2026-07-30T00:00:04Z",
+      "duration_ms": 1200,
+      "modality": "web",
+      "request_intent": "state_transition",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "transactional",
+      "state_transition_subtype": "state_change",
+      "interaction": {
+        "target": "click Sign In",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Auth succeeded — redirected to dashboard"
+        }
+      },
+      "observation": {
+        "what_happened": "Clicked Sign In button. Auth flow completed. Redirected to /activity dashboard.",
+        "what_learned": "Login takes 1200ms including redirect. Auth FSM: credentials → authenticated → dashboard. Parallels Plaid M0 auth flow.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Credentials entered"],
+        "postconditions": ["User authenticated", "Dashboard loaded"],
+        "state_changes": ["auth_state: unauthenticated → authenticated", "page: /login → /activity"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-003"],
+        "enables": ["web-span-005"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "interaction", "auth", "state_transition"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/activity",
+        "page_title": "Plaid Dashboard - Activity",
+        "action": "click",
+        "element_role": "button",
+        "element_name": "Sign In",
+        "selector": "#sign-in-btn",
+        "snapshot_hash": "d4e5f6a1b2c3"
+      },
+      "contains_contexts": [
+        {
+          "modality": "api",
+          "relationship": "triggers",
+          "active": true,
+          "description": "Sign In click triggers POST /auth/login API call"
+        }
+      ]
+    },
+    {
+      "span_id": "web-span-005",
+      "trace_id": "trace-web-session-001",
+      "sequence": 5,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:04Z",
+      "ended_at": "2026-07-30T00:00:05Z",
+      "duration_ms": 50,
+      "modality": "web",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "transactional",
+      "interaction": {
+        "target": "observe dashboard",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Dashboard AXTree captured — 47 interactive elements"
+        }
+      },
+      "observation": {
+        "what_happened": "Captured AXTree snapshot of dashboard page. 47 interactive elements detected.",
+        "what_learned": "Dashboard has navigation menu (8 links), activity feed (12 items), and sidebar with account summary. Snapshot hash for delta tracking.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Authenticated and on dashboard"],
+        "postconditions": ["Dashboard state captured"],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": ["web-span-004"],
+        "enables": ["web-span-006"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "observation", "axtree"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/activity",
+        "page_title": "Plaid Dashboard - Activity",
+        "action": "observe",
+        "snapshot_hash": "e5f6a1b2c3d4",
+        "viewport_width": 1920,
+        "viewport_height": 1080
+      }
+    },
+    {
+      "span_id": "web-span-006",
+      "trace_id": "trace-web-session-001",
+      "sequence": 6,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:05Z",
+      "ended_at": "2026-07-30T00:00:06Z",
+      "duration_ms": 200,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "error",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "transactional",
+      "interaction": {
+        "target": "click Refresh Transactions",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Element not found — button not yet rendered after page transition",
+          "error": "element_not_found: #refresh-btn not in AXTree"
+        }
+      },
+      "observation": {
+        "what_happened": "Attempted to click Refresh Transactions button but element not yet in AXTree. Page still loading async content.",
+        "what_learned": "Dashboard async-loads transaction section. Button appears after data fetch completes. Need to wait for element before interacting.",
+        "confidence": "high",
+        "surprises": "Element timing issue — dashboard renders shell before data",
+        "questions_raised": ["What is the typical load time for the transactions section?"]
+      },
+      "state": {
+        "preconditions": ["On dashboard"],
+        "postconditions": ["Click failed — no state change"],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": ["web-span-005"],
+        "enables": ["web-span-007"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "interaction", "error", "element_not_found"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/activity",
+        "page_title": "Plaid Dashboard - Activity",
+        "action": "click",
+        "element_role": "button",
+        "element_name": "Refresh Transactions",
+        "selector": "#refresh-btn",
+        "snapshot_hash": "e5f6a1b2c3d4",
+        "delta_from": "web-span-005"
+      },
+      "expected_outcome": {"description": "Refresh button clicked, transaction sync triggered", "confidence": 0.7},
+      "actual_outcome": {"description": "Element not found — async content not yet loaded"},
+      "divergence_score": 0.8
+    },
+    {
+      "span_id": "web-span-007",
+      "trace_id": "trace-web-session-001",
+      "sequence": 7,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:06Z",
+      "ended_at": "2026-07-30T00:00:07Z",
+      "duration_ms": 450,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "partial",
+      "span_structure": "transactional",
+      "interaction": {
+        "target": "click Refresh Transactions",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Transactions refresh triggered — 847 transactions loading"
+        }
+      },
+      "observation": {
+        "what_happened": "Waited for element, then clicked Refresh Transactions button successfully. Transaction sync started.",
+        "what_learned": "After waiting 250ms for async load, button appeared and click succeeded. 450ms total including wait + API trigger. Retry after element_not_found works with wait strategy.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Previous click failed — waited for element"],
+        "postconditions": ["Transaction sync triggered"],
+        "state_changes": ["Transaction list refreshing"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-006"],
+        "enables": ["web-span-008"],
+        "contradicts": [],
+        "refines": ["web-span-006"]
+      },
+      "tags": ["web", "interaction", "retry", "success"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/activity",
+        "page_title": "Plaid Dashboard - Activity",
+        "action": "click",
+        "element_role": "button",
+        "element_name": "Refresh Transactions",
+        "selector": "#refresh-btn",
+        "element_state": {"disabled": false, "expanded": false},
+        "snapshot_hash": "f6a1b2c3d4e5",
+        "delta_from": "web-span-006"
+      },
+      "contains_contexts": [
+        {
+          "modality": "api",
+          "relationship": "triggers",
+          "active": true,
+          "description": "Refresh click triggers POST /transactions/sync API call"
+        }
+      ]
+    },
+    {
+      "span_id": "web-span-008",
+      "trace_id": "trace-web-session-001",
+      "sequence": 8,
+      "kind": "api_call",
+      "started_at": "2026-07-30T00:00:07Z",
+      "ended_at": "2026-07-30T00:00:08Z",
+      "duration_ms": 30,
+      "modality": "web",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "partial",
+      "span_structure": "transactional",
+      "interaction": {
+        "target": "observe transactions",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "AXTree delta — transactions table updated with 847 rows"
+        }
+      },
+      "observation": {
+        "what_happened": "Captured AXTree delta after transaction refresh. Table now shows 847 transactions.",
+        "what_learned": "Delta compression effective — only transactions table subtree changed. Same snapshot_hash as previous full snapshot except transactions section. Change rate: 15% of tree nodes updated.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Transaction sync completed"],
+        "postconditions": ["Updated dashboard state captured"],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": ["web-span-007"],
+        "enables": [],
+        "contradicts": [],
+        "refines": ["web-span-005"]
+      },
+      "tags": ["web", "observation", "delta", "axtree"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.plaid.com/activity",
+        "page_title": "Plaid Dashboard - Activity",
+        "action": "observe",
+        "snapshot_hash": "a7b8c9d0e1f2",
+        "delta_from": "web-span-007",
+        "viewport_width": 1920,
+        "viewport_height": 1080
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-web-001",
+      "trace_id": "trace-web-session-001",
+      "source_spans": ["web-span-006", "web-span-007"],
+      "category": "error_pattern",
+      "title": "Element not found on async-loaded dashboard content",
+      "description": "Dashboard renders shell before loading transaction data asynchronously. Clicking the Refresh button before async load completes produces element_not_found. Wait + retry strategy resolves it. Safe to retry after waiting for AXTree update.",
+      "evidence": ["web-span-006", "web-span-007"],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": ["web", "element_not_found", "async", "retry"]
+    },
+    {
+      "finding_id": "finding-web-002",
+      "trace_id": "trace-web-session-001",
+      "source_spans": ["web-span-005", "web-span-008"],
+      "category": "protocol",
+      "title": "AXTree delta compression effective — 85% unchanged nodes between snapshots",
+      "description": "Consecutive AXTree snapshots show only 15% node changes after transaction refresh. Delta compression via snapshot_hash tracking reduces trace size significantly. Change rate is a reliable volatility signal.",
+      "evidence": ["web-span-005", "web-span-008"],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": ["web", "compression", "delta", "axtree"]
+    }
+  ],
+  "metadata": {}
+}

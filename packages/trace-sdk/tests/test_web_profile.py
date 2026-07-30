@@ -187,6 +187,21 @@ class TestWebExtEnhanced:
         assert restored.snapshot_hash == "abc123"
         assert restored.delta_from == "web-span-001"
 
+    def test_element_state_roundtrip(self):
+        ext = WebExt(
+            element_role="checkbox",
+            element_state={"checked": True, "disabled": False},
+        )
+        d = ext.to_dict()
+        assert d["element_state"] == {"checked": True, "disabled": False}
+        restored = WebExt.from_dict(d)
+        assert restored.element_state == {"checked": True, "disabled": False}
+
+    def test_element_state_omitted_when_none(self):
+        ext = WebExt(page_url="https://example.com")
+        d = ext.to_dict()
+        assert "element_state" not in d
+
     def test_password_field_masked_in_trace(self):
         """Demonstrate the privacy workflow: mask before constructing WebExt."""
         raw_password = "s3cret!"
