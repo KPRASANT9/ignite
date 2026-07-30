@@ -24,7 +24,15 @@ PII_PATTERNS = [
 
 REDACTED = "[REDACTED]"
 PII_REDACTED = "[PII_REDACTED]"
+WEB_INPUT_MASKED = "***"
 MAX_BODY_LENGTH = 1024
+
+# Keys in modality_ext dicts that hold web input values needing privacy checks
+_WEB_SENSITIVE_NAME_PATTERNS = re.compile(
+    r"(password|passwd|ssn|social.?security|card.?number|cvv|cvc|"
+    r"credit.?card|account.?number|routing.?number|pin)",
+    re.I,
+)
 
 
 def sanitize_string(value: str) -> str:
@@ -64,6 +72,25 @@ def sanitize_value(value: Any) -> Any:
         return sanitize_dict(value)
     if isinstance(value, list):
         return [sanitize_value(item) for item in value]
+    return value
+
+
+def sanitize_web_input(
+    value: str | None,
+    element_name: str | None = None,
+    input_type: str | None = None,
+) -> str | None:
+    """Mask web input values for sensitive fields (P0 privacy requirement).
+
+    Returns '***' if the input is for a sensitive field, original value otherwise.
+    Detection: input_type='password' OR element_name matches sensitive patterns.
+    """
+    if value is None:
+        return None
+    if input_type and input_type.lower() == "password":
+        return WEB_INPUT_MASKED
+    if element_name and _WEB_SENSITIVE_NAME_PATTERNS.search(element_name):
+        return WEB_INPUT_MASKED
     return value
 
 
