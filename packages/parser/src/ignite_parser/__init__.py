@@ -18,6 +18,8 @@ from ignite_parser.feedback import capture_feedback, compute_divergence, lookup_
 from ignite_parser.orchestrator import run_pipeline, run_loop, LoopResult
 from ignite_parser.accuracy import measure_accuracy, AccuracyReport
 from ignite_parser.ops import run_ops, OpsReport
+from ignite_parser.spike import detect_spikes, SpikeSignal, SpikeType, Urgency
+from ignite_parser.loop_detector import detect_loops, DetectedLoop, LoopDetectionResult
 
 __all__ = [
     # Parser
@@ -41,4 +43,8 @@ __all__ = [
     "measure_accuracy", "AccuracyReport",
     # Ops
     "run_ops", "OpsReport",
+    # Spike Detection
+    "detect_spikes", "SpikeSignal", "SpikeType", "Urgency",
+    # Loop Detection
+    "detect_loops", "DetectedLoop", "LoopDetectionResult",
 ]
