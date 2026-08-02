@@ -57,6 +57,7 @@ class FindingCategory(str, Enum):
     CROSS_MODALITY = "cross_modality"
     INTELLIGENCE = "intelligence"
     ARCHITECTURE = "architecture"
+    SECURITY = "security"
 
 
 class Confidence(str, Enum):
