@@ -1,0 +1,40 @@
+{
+  "name": "ignite-extension",
+  "displayName": "IGNITE",
+  "version": "0.1.0",
+  "description": "Browser-resident intelligence layer for digital system operations",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "plasmo": "^0.89.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@plasmohq/prettier-plugin-sort-imports": "^4.0.1",
+    "@types/chrome": "^0.0.268",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "manifest": {
+    "permissions": [
+      "storage",
+      "sidePanel",
+      "webRequest",
+      "alarms",
+      "identity"
+    ],
+    "host_permissions": [
+      "http://localhost:*/*",
+      "https://*.atlassian.net/*",
+      "https://github.com/*",
+      "https://*.cloud.databricks.com/*"
+    ]
+  }
+}
