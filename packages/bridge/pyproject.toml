@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ignite-bridge"
+version = "0.1.0"
+description = "IGNITE Bridge — FastAPI service wrapping the L2 pipeline"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "ignite-parser",
+]
+
+[project.scripts]
+ignite-bridge = "ignite_bridge.__main__:main"
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "httpx>=0.24"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
