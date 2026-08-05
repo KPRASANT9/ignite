@@ -143,7 +143,7 @@ export async function ingestTraceAuthenticated(
   if (cred) {
     headers["Authorization"] = `Bearer ${cred.token}`
   }
-  const res = await fetch(`${bridgeUrl}/traces`, {
+  const res = await fetch(`${bridgeUrl}/traces/web`, {
     method: "POST",
     headers,
     body: JSON.stringify(traceData),

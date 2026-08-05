@@ -176,21 +176,25 @@ def _wrap_web_spans(spans: list[dict], system: str = "unknown") -> dict:
             "ended_at": None,
             "duration_ms": raw.get("duration_ms", 0),
             "interaction": {
-                "target": raw.get("target", raw.get("operation", "")),
+                "target": raw.get("selector", raw.get("page_url", "")),
                 "method": None,
                 "request": {},
                 "response": {},
             },
             "observation": {
-                "what_happened": f"Web interaction: {raw.get('operation', 'unknown')} on {raw.get('target', 'unknown')}",
-                "what_learned": f"Captured {raw.get('operation', 'unknown')} event via WebExt content script",
+                "what_happened": f"Web interaction: {raw.get('action', 'unknown')} on {raw.get('selector', raw.get('page_url', 'unknown'))}",
+                "what_learned": f"Captured {raw.get('action', 'unknown')} event on {raw.get('page_url', 'unknown')} via WebExt content script",
                 "confidence": "low",
             },
             "metadata": {
                 "modality": "web",
                 "web_kind": "client",
-                "operation": raw.get("operation", ""),
-                "attributes": raw.get("attributes", {}),
+                "action": raw.get("action", ""),
+                "page_url": raw.get("page_url", ""),
+                "page_title": raw.get("page_title", ""),
+                "element_role": raw.get("element_role", ""),
+                "element_text": raw.get("element_text", ""),
+                "input_type": raw.get("input_type", ""),
             },
         })
 
@@ -239,12 +243,13 @@ def create_app() -> FastAPI:
     @app.get("/traces/spikes")
     async def spike_stream():
         async def generate():
+            yield f"data: {json.dumps({'type': 'connected'})}\n\n"
             last_seen = len(_spike_buffer)
             while True:
                 current = len(_spike_buffer)
                 if current > last_seen:
                     for spike in list(_spike_buffer)[last_seen:current]:
-                        yield f"data: {json.dumps(spike)}\n\n"
+                        yield f"data: {json.dumps({'type': 'spike', 'spike': spike})}\n\n"
                     last_seen = current
                 await asyncio.sleep(1)
 

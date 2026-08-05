@@ -47,8 +47,9 @@ export async function invoke(
     headers,
     body: JSON.stringify({
       tool: "invoke",
-      params: { endpoint, method, params },
+      arguments: { endpoint, method, params },
       system,
+      archetype: "mcp-sync",
     }),
   })
   const latency_ms = Math.round(performance.now() - start)
@@ -100,8 +101,9 @@ export async function analyzeLatency(
     headers,
     body: JSON.stringify({
       tool: "analyze_latency",
-      params: { endpoint_filter: endpointFilter, window_minutes: windowMinutes },
+      arguments: { endpoint: endpointFilter, window_minutes: windowMinutes },
       system,
+      archetype: "mcp-sync",
     }),
   })
   const latency_ms = Math.round(performance.now() - start)

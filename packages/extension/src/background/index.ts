@@ -160,7 +160,7 @@ async function handleMcpInvoke(
   const res = await fetch(`${bridgeUrl}/mcp/tools/call`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ tool, params, system }),
+    body: JSON.stringify({ tool, arguments: params, system, archetype }),
   })
 
   if (!res.ok) {

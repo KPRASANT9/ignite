@@ -6,6 +6,8 @@ build/
 .eggs/
 *.egg
 .venv/
+packages/extension/node_modules
+packages/extension/package-lock.json
 .env
 .pytest_cache/
 .ruff_cache/
