@@ -1,12 +1,8 @@
-"""IGNITE Transport Bridge — FastAPI service wrapping the L2 pipeline.
+"""IGNITE Bridge — FastAPI service wrapping the L2 pipeline.
 
-Exposes the existing Python L2 pipeline (Parser → Analyzer → Spike Detection)
-over HTTP for the browser extension to consume.
-
-Endpoints:
-  POST /traces         — ingest a trace JSON, run through L2, return analysis + spikes
-  GET  /traces/spikes  — SSE stream of spike signals for real-time extension feedback
-  GET  /health         — service health check
+Exposes the Python L2 pipeline (Parser → Analyzer → Spike Detection)
+over HTTP for the browser extension to consume. Includes MCP routing
+and auth header forwarding for downstream API access.
 """
 
 from ignite_bridge.app import create_app
