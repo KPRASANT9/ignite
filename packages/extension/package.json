@@ -12,7 +12,8 @@
   "dependencies": {
     "plasmo": "^0.89.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@plasmohq/prettier-plugin-sort-imports": "^4.0.1",
@@ -31,10 +32,7 @@
       "identity"
     ],
     "host_permissions": [
-      "http://localhost:*/*",
-      "https://*.atlassian.net/*",
-      "https://github.com/*",
-      "https://*.cloud.databricks.com/*"
+      "<all_urls>"
     ]
   }
 }

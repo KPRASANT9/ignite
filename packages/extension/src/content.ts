@@ -11,6 +11,13 @@
  * into the L2 pipeline via the service worker → bridge transport.
  */
 
+import type { PlasmoCSConfig } from "plasmo"
+
+export const config: PlasmoCSConfig = {
+  matches: ["<all_urls>"],
+  run_at: "document_idle",
+}
+
 import { detectSystem } from "~/lib/systems"
 
 // --- System Detection (Strategy 1: URL match) ---
