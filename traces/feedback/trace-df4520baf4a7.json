@@ -1,0 +1,879 @@
+{
+  "schema_version": "0.2",
+  "trace_id": "trace-df4520baf4a7",
+  "agent_id": "ignite-executor",
+  "agent_role": "explorer",
+  "system": "ignite",
+  "study_channel": "",
+  "session_id": "session-ae9ab949",
+  "started_at": "2026-07-29T10:06:31.595231+00:00",
+  "ended_at": "2026-07-29T10:06:31.595714+00:00",
+  "status": "completed",
+  "objective": "Execute plan with 10 actions",
+  "findings_summary": "Executed 10 actions: 10 succeeded, 0 failed, 0 skipped",
+  "spans": [
+    {
+      "span_id": "span-ef96862ad501",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 1,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595272+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Generate typed FSM model: Item lifecycle has 5+ error states with a unified recovery p",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "generate_model completed successfully. Outputs: Generated typed FSM model: ItemLifecycleError",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce generate_model artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/models/item_lifecycle_error_fsm.py"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-001",
+        "action_kind": "generate_model",
+        "status": "success",
+        "metrics": {
+          "syntax_valid": true,
+          "state_count": 9,
+          "transition_count": 0,
+          "class_name": "ItemLifecycleError"
+        }
+      },
+      "modality": "api",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "generate_model completed successfully with valid syntax",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "generate_model completed successfully. Outputs: Generated typed FSM model: ItemLifecycleError"
+      },
+      "divergence_score": 0.762,
+      "ended_at": "2026-07-29T10:06:31.595316+00:00"
+    },
+    {
+      "span_id": "span-ac1996a1dee1",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 2,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595356+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Generate typed FSM model: Item lifecycle FSM: 5 states (GOOD, LOGIN_REQUIRED, CONSENT_",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "generate_model completed successfully. Outputs: Generated typed FSM model: ItemLifecycle",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce generate_model artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/models/item_lifecycle_fsm.py"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-002",
+        "action_kind": "generate_model",
+        "status": "success",
+        "metrics": {
+          "syntax_valid": true,
+          "state_count": 9,
+          "transition_count": 0,
+          "class_name": "ItemLifecycle"
+        }
+      },
+      "modality": "api",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "generate_model completed successfully with valid syntax",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "generate_model completed successfully. Outputs: Generated typed FSM model: ItemLifecycle"
+      },
+      "divergence_score": 0.762,
+      "ended_at": "2026-07-29T10:06:31.595383+00:00"
+    },
+    {
+      "span_id": "span-de087550f18a",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 3,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595412+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Generate typed FSM model: Sync cursor survives Item error state transitions \u2014 incremen",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "generate_model completed successfully. Outputs: Generated typed FSM model: SyncCursorSurvives",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce generate_model artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/models/sync_cursor_survives_fsm.py"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-003",
+        "action_kind": "generate_model",
+        "status": "success",
+        "metrics": {
+          "syntax_valid": true,
+          "state_count": 1,
+          "transition_count": 0,
+          "class_name": "SyncCursorSurvives"
+        }
+      },
+      "modality": "api",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "generate_model completed successfully with valid syntax",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "generate_model completed successfully. Outputs: Generated typed FSM model: SyncCursorSurvives"
+      },
+      "divergence_score": 0.762,
+      "ended_at": "2026-07-29T10:06:31.595432+00:00"
+    },
+    {
+      "span_id": "span-45d62662c9b7",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 4,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595456+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Generate typed FSM model: Transaction sync has a 3-state FSM: UNSYNCED \u2192 PARTIAL \u2192 FUL",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "generate_model completed successfully. Outputs: Generated typed FSM model: TransactionSync",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce generate_model artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/models/transaction_sync_fsm.py"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-004",
+        "action_kind": "generate_model",
+        "status": "success",
+        "metrics": {
+          "syntax_valid": true,
+          "state_count": 5,
+          "transition_count": 0,
+          "class_name": "TransactionSync"
+        }
+      },
+      "modality": "api",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "generate_model completed successfully with valid syntax",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "generate_model completed successfully. Outputs: Generated typed FSM model: TransactionSync"
+      },
+      "divergence_score": 0.762,
+      "ended_at": "2026-07-29T10:06:31.595474+00:00"
+    },
+    {
+      "span_id": "span-89b39bb1960e",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 5,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595499+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Generate typed FSM model: ITEM_LOGIN_REQUIRED is recoverable \u2014 cursor survives re-auth",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "generate_model completed successfully. Outputs: Generated typed FSM model: Item_login_requiredRecoverableCursor",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce generate_model artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/models/item_login_required_recoverable_cursor_fsm.py"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-005",
+        "action_kind": "generate_model",
+        "status": "success",
+        "metrics": {
+          "syntax_valid": true,
+          "state_count": 3,
+          "transition_count": 0,
+          "class_name": "Item_login_requiredRecoverableCursor"
+        }
+      },
+      "modality": "api",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "generate_model completed successfully with valid syntax",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "generate_model completed successfully. Outputs: Generated typed FSM model: Item_login_requiredRecoverableCursor"
+      },
+      "divergence_score": 0.762,
+      "ended_at": "2026-07-29T10:06:31.595517+00:00"
+    },
+    {
+      "span_id": "span-e369a2a702ba",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 6,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595539+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Generate error handler with recovery routing",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "generate_handler completed successfully. Outputs: Generated error handler for 3 error patterns",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce generate_handler artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/handlers/error_handler.py"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-006",
+        "action_kind": "generate_handler",
+        "status": "success",
+        "metrics": {
+          "syntax_valid": true,
+          "error_pattern_count": 3
+        }
+      },
+      "modality": "api",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "generate_handler completed successfully with valid syntax",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "generate_handler completed successfully. Outputs: Generated error handler for 3 error patterns"
+      },
+      "divergence_score": 0.771,
+      "ended_at": "2026-07-29T10:06:31.595558+00:00"
+    },
+    {
+      "span_id": "span-66eec9fba747",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 7,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595579+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Generate typed API client from endpoint catalog",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "generate_client completed successfully. Outputs: Generated typed client for 15 endpoints",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce generate_client artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/clients/api_client.py"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-007",
+        "action_kind": "generate_client",
+        "status": "success",
+        "metrics": {
+          "syntax_valid": true,
+          "endpoint_count": 15
+        }
+      },
+      "modality": "api",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "generate_client completed successfully with valid syntax",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "generate_client completed successfully. Outputs: Generated typed client for 15 endpoints"
+      },
+      "divergence_score": 0.771,
+      "ended_at": "2026-07-29T10:06:31.595598+00:00"
+    },
+    {
+      "span_id": "span-2c4875718fb2",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 8,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595618+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Explore missing span kind: config_inspect",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "explore completed successfully. Outputs: Exploration directive: config_inspect",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce explore artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/directives/explore_config_inspect.json"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-008",
+        "action_kind": "explore",
+        "status": "success",
+        "metrics": {
+          "target_span_kind": "config_inspect"
+        }
+      },
+      "modality": "api",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "explore completed successfully producing directive",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "explore completed successfully. Outputs: Exploration directive: config_inspect"
+      },
+      "divergence_score": 0.72,
+      "ended_at": "2026-07-29T10:06:31.595635+00:00"
+    },
+    {
+      "span_id": "span-6537de1f683b",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 9,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595654+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Explore missing span kind: sdk_inspect",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "explore completed successfully. Outputs: Exploration directive: sdk_inspect",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce explore artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/directives/explore_sdk_inspect.json"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-009",
+        "action_kind": "explore",
+        "status": "success",
+        "metrics": {
+          "target_span_kind": "sdk_inspect"
+        }
+      },
+      "modality": "api",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "explore completed successfully producing directive",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "explore completed successfully. Outputs: Exploration directive: sdk_inspect"
+      },
+      "divergence_score": 0.72,
+      "ended_at": "2026-07-29T10:06:31.595670+00:00"
+    },
+    {
+      "span_id": "span-49be903d78b4",
+      "trace_id": "trace-df4520baf4a7",
+      "sequence": 10,
+      "kind": "action_result",
+      "started_at": "2026-07-29T10:06:31.595689+00:00",
+      "duration_ms": 0,
+      "interaction": {
+        "target": "Investigate 32 open questions from traces",
+        "method": null,
+        "request": {
+          "url": null,
+          "headers": null,
+          "params": null,
+          "body": null
+        },
+        "response": {
+          "status_code": null,
+          "headers": null,
+          "body_summary": "",
+          "body_schema": null,
+          "error": null
+        }
+      },
+      "observation": {
+        "what_happened": "explore completed successfully. Outputs: Exploration directive: open questions",
+        "what_learned": "Successfully generated 1 file(s). Pipeline can produce explore artifacts.",
+        "confidence": "high",
+        "surprises": null,
+        "questions_raised": []
+      },
+      "state": {
+        "preconditions": [],
+        "postconditions": [
+          "Generated file: output/directives/explore_questions.json"
+        ],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": [],
+      "metadata": {
+        "action_id": "action-010",
+        "action_kind": "explore",
+        "status": "success",
+        "metrics": {
+          "target_span_kind": null
+        }
+      },
+      "modality": "api",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "expected_outcome": {
+        "description": "explore completed successfully producing directive",
+        "confidence": 0.8
+      },
+      "actual_outcome": {
+        "description": "explore completed successfully. Outputs: Exploration directive: open questions"
+      },
+      "divergence_score": 0.736,
+      "ended_at": "2026-07-29T10:06:31.595704+00:00"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-404fddfc8d36",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-ef96862ad501"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Generate typed FSM model: Item lifecycle has 5+ error states with a unified recovery p",
+      "description": "generate_model completed successfully. Outputs: Generated typed FSM model: ItemLifecycleError",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-ce4d8b23ef9f",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-ac1996a1dee1"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Generate typed FSM model: Item lifecycle FSM: 5 states (GOOD, LOGIN_REQUIRED, CONSENT_",
+      "description": "generate_model completed successfully. Outputs: Generated typed FSM model: ItemLifecycle",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-49e6bee7b74c",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-de087550f18a"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Generate typed FSM model: Sync cursor survives Item error state transitions \u2014 incremen",
+      "description": "generate_model completed successfully. Outputs: Generated typed FSM model: SyncCursorSurvives",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-e1e2eef67198",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-45d62662c9b7"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Generate typed FSM model: Transaction sync has a 3-state FSM: UNSYNCED \u2192 PARTIAL \u2192 FUL",
+      "description": "generate_model completed successfully. Outputs: Generated typed FSM model: TransactionSync",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-244ce16a4ba4",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-89b39bb1960e"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Generate typed FSM model: ITEM_LOGIN_REQUIRED is recoverable \u2014 cursor survives re-auth",
+      "description": "generate_model completed successfully. Outputs: Generated typed FSM model: Item_login_requiredRecoverableCursor",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-4e1c4b1e039f",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-e369a2a702ba"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Generate error handler with recovery routing",
+      "description": "generate_handler completed successfully. Outputs: Generated error handler for 3 error patterns",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-1ef4b7b9ace6",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-66eec9fba747"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Generate typed API client from endpoint catalog",
+      "description": "generate_client completed successfully. Outputs: Generated typed client for 15 endpoints",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-e21b24d8a03e",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-2c4875718fb2"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Explore missing span kind: config_inspect",
+      "description": "explore completed successfully. Outputs: Exploration directive: config_inspect",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-eabe702274f4",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-6537de1f683b"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Explore missing span kind: sdk_inspect",
+      "description": "explore completed successfully. Outputs: Exploration directive: sdk_inspect",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    },
+    {
+      "finding_id": "finding-7d461ee53709",
+      "trace_id": "trace-df4520baf4a7",
+      "source_spans": [
+        "span-49be903d78b4"
+      ],
+      "category": "protocol",
+      "title": "Action completed: Investigate 32 open questions from traces",
+      "description": "explore completed successfully. Outputs: Exploration directive: open questions",
+      "evidence": [],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": [],
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "plan_action_count": 10,
+    "success_rate": 1.0
+  }
+}

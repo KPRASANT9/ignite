@@ -10,6 +10,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from ignite_trace.modality import (
+    DeltaFromPrior,
+    Modality,
+    RequestIntent,
+    ResponseOutcome,
+    SignalClass,
+    SpanStructure,
+    StateTransitionSubtype,
+)
 from ignite_trace.sanitizer import sanitize_dict, sanitize_string, truncate_body
 
 
@@ -66,6 +75,28 @@ class SpanBuilder:
         # Tags & metadata
         self._tags: list[str] = []
         self._metadata: dict[str, Any] = {}
+
+        # v0.2 classification fields
+        self._modality: str = Modality.API.value
+        self._request_intent: str = RequestIntent.QUERY.value
+        self._response_outcome: str = ResponseOutcome.SUCCESS.value
+        self._signal_class: str = SignalClass.INTENT_CARRYING.value
+        self._delta_from_prior: str = DeltaFromPrior.FULL.value
+        self._state_transition_subtype: str | None = None
+        self._correlation_ids: list[str] = []
+
+        # v0.2 feedback divergence fields
+        self._expected_outcome: dict[str, Any] | None = None
+        self._actual_outcome: dict[str, Any] | None = None
+        self._divergence_score: float | None = None
+
+        # v0.2 modality extension
+        self._modality_ext: dict[str, Any] | None = None
+
+        # Schema v13 fields
+        self._span_structure: str | None = None
+        self._contains_contexts: list[dict[str, Any]] = []
+        self._compression_ratio: float | None = None
 
     def __enter__(self) -> SpanBuilder:
         self._started_at = datetime.now(timezone.utc)
@@ -159,6 +190,96 @@ class SpanBuilder:
         self._refines.append(span_id)
         return self
 
+    # --- v0.2 classification setters ---
+
+    def classify(
+        self,
+        modality: str | None = None,
+        request_intent: str | None = None,
+        response_outcome: str | None = None,
+        signal_class: str | None = None,
+        delta_from_prior: str | None = None,
+        state_transition_subtype: str | None = None,
+    ) -> SpanBuilder:
+        """Set v0.2 classification fields in one call."""
+        if modality is not None:
+            self._modality = modality
+        if request_intent is not None:
+            self._request_intent = request_intent
+        if response_outcome is not None:
+            self._response_outcome = response_outcome
+        if signal_class is not None:
+            self._signal_class = signal_class
+        if delta_from_prior is not None:
+            self._delta_from_prior = delta_from_prior
+        if state_transition_subtype is not None:
+            self._state_transition_subtype = state_transition_subtype
+        return self
+
+    def correlate(self, *ids: str) -> SpanBuilder:
+        """Add correlation IDs for cross-device/cross-session tracking."""
+        self._correlation_ids.extend(ids)
+        return self
+
+    def expect(self, description: str, confidence: float = 0.5) -> SpanBuilder:
+        """Set expected outcome before execution — the ErrP prediction."""
+        self._expected_outcome = {"description": description, "confidence": confidence}
+        return self
+
+    def actual(self, description: str) -> SpanBuilder:
+        """Set actual outcome after execution — compared against expected."""
+        self._actual_outcome = {"description": description}
+        return self
+
+    def divergence(self, score: float) -> SpanBuilder:
+        """Set divergence score (0.0 = matched expectation, 1.0 = total mismatch)."""
+        self._divergence_score = max(0.0, min(1.0, score))
+        return self
+
+    def modality_ext(self, ext: Any) -> SpanBuilder:
+        """Set a typed modality extension (ApiExt, DbExt, CliExt, MsgExt, WebExt).
+
+        The extension must have a to_dict() method.
+        """
+        if hasattr(ext, "to_dict"):
+            self._modality_ext = ext.to_dict()
+        elif isinstance(ext, dict):
+            self._modality_ext = ext
+        return self
+
+    # --- Schema v13 setters ---
+
+    def structure(self, span_structure: str) -> SpanBuilder:
+        """Set span structure — how this span relates to others in the session."""
+        self._span_structure = span_structure
+        return self
+
+    def contains_context(
+        self,
+        modality: str,
+        relationship: str,
+        active: bool = True,
+        context_id: str | None = None,
+        description: str | None = None,
+    ) -> SpanBuilder:
+        """Add a cross-modality context reference."""
+        ctx: dict[str, Any] = {
+            "modality": modality,
+            "relationship": relationship,
+            "active": active,
+        }
+        if context_id is not None:
+            ctx["context_id"] = context_id
+        if description is not None:
+            ctx["description"] = description
+        self._contains_contexts.append(ctx)
+        return self
+
+    def compression(self, ratio: float) -> SpanBuilder:
+        """Set the compression ratio (rows_scanned / rows_returned)."""
+        self._compression_ratio = ratio
+        return self
+
     def tag(self, *tags: str) -> SpanBuilder:
         self._tags.extend(tags)
         return self
@@ -219,7 +340,40 @@ class SpanBuilder:
             },
             "tags": self._tags,
             "metadata": self._metadata,
+            # v0.2 classification fields
+            "modality": self._modality,
+            "request_intent": self._request_intent,
+            "response_outcome": self._response_outcome,
+            "signal_class": self._signal_class,
+            "delta_from_prior": self._delta_from_prior,
         }
+
+        if self._state_transition_subtype is not None:
+            d["state_transition_subtype"] = self._state_transition_subtype
+
+        if self._correlation_ids:
+            d["correlation_ids"] = self._correlation_ids
+
+        if self._expected_outcome is not None:
+            d["expected_outcome"] = self._expected_outcome
+
+        if self._actual_outcome is not None:
+            d["actual_outcome"] = self._actual_outcome
+
+        if self._divergence_score is not None:
+            d["divergence_score"] = self._divergence_score
+
+        if self._modality_ext is not None:
+            d["modality_ext"] = self._modality_ext
+
+        if self._span_structure is not None:
+            d["span_structure"] = self._span_structure
+
+        if self._contains_contexts:
+            d["contains_contexts"] = self._contains_contexts
+
+        if self._compression_ratio is not None:
+            d["compression_ratio"] = self._compression_ratio
 
         if self.parent_span_id:
             d["parent_span_id"] = self.parent_span_id

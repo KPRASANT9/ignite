@@ -1,0 +1,441 @@
+{
+  "schema_version": "0.2",
+  "trace_id": "trace-web-session-008",
+  "agent_id": "WebExplorer",
+  "agent_role": "explorer",
+  "system": "ignite",
+  "study_channel": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "session_id": "web-sess-008",
+  "started_at": "2026-07-30T02:00:00Z",
+  "ended_at": "2026-07-30T02:05:00Z",
+  "status": "completed",
+  "objective": "Validate Web modality flows through universal pipeline — login, navigate, interact, observe",
+  "session_intent": "exploration",
+  "findings_summary": "Web traces flow through same pipeline as API and DB. Privacy masking confirmed for password fields.",
+  "spans": [
+    {
+      "span_id": "web-span-001",
+      "trace_id": "trace-web-session-008",
+      "sequence": 1,
+      "kind": "api_call",
+      "started_at": "2026-07-30T02:00:00Z",
+      "ended_at": "2026-07-30T02:00:02Z",
+      "duration_ms": 2000,
+      "modality": "web",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "navigational",
+      "interaction": {
+        "target": "navigate https://dashboard.example.com/login",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Login page loaded — username and password fields visible"
+        }
+      },
+      "observation": {
+        "what_happened": "Navigated to login page. AXTree shows form with username (textbox) and password (textbox, type=password) fields, plus Submit button.",
+        "what_learned": "Login form is a standard username/password flow. No MFA prompt visible on initial load.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Browser launched"],
+        "postconditions": ["Login page loaded, form elements accessible"],
+        "state_changes": ["page: blank → login"]
+      },
+      "relationships": {
+        "depends_on": [],
+        "enables": ["web-span-002"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "navigation", "login"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.example.com/login",
+        "page_title": "Login — Dashboard",
+        "action": "navigate",
+        "snapshot_hash": "axtree-hash-001",
+        "viewport_width": 1920,
+        "viewport_height": 1080
+      }
+    },
+    {
+      "span_id": "web-span-002",
+      "trace_id": "trace-web-session-008",
+      "sequence": 2,
+      "kind": "api_call",
+      "started_at": "2026-07-30T02:00:02Z",
+      "ended_at": "2026-07-30T02:00:03Z",
+      "duration_ms": 500,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "partial",
+      "span_structure": "navigational",
+      "interaction": {
+        "target": "type #username",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Username field populated"
+        }
+      },
+      "observation": {
+        "what_happened": "Typed username into the login form username field.",
+        "what_learned": "Username field accepts freeform text input. No validation on keypress.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Login page loaded"],
+        "postconditions": ["Username field populated"],
+        "state_changes": ["username field: empty → populated"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-001"],
+        "enables": ["web-span-003"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "input", "login"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.example.com/login",
+        "page_title": "Login — Dashboard",
+        "action": "type",
+        "element_role": "textbox",
+        "element_name": "username",
+        "input_value": "test@example.com",
+        "input_type": "text",
+        "selector": "#username",
+        "snapshot_hash": "axtree-hash-002",
+        "delta_from": "web-span-001"
+      }
+    },
+    {
+      "span_id": "web-span-003",
+      "trace_id": "trace-web-session-008",
+      "sequence": 3,
+      "kind": "api_call",
+      "started_at": "2026-07-30T02:00:03Z",
+      "ended_at": "2026-07-30T02:00:04Z",
+      "duration_ms": 500,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "partial",
+      "span_structure": "navigational",
+      "interaction": {
+        "target": "type #password",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Password field populated (masked)"
+        }
+      },
+      "observation": {
+        "what_happened": "Typed password into the login form password field.",
+        "what_learned": "Password field masks input as expected. Field type=password.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Username entered"],
+        "postconditions": ["Password field populated"],
+        "state_changes": ["password field: empty → populated"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-002"],
+        "enables": ["web-span-004"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "input", "login", "sensitive"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.example.com/login",
+        "page_title": "Login — Dashboard",
+        "action": "type",
+        "element_role": "textbox",
+        "element_name": "password",
+        "input_value": "***",
+        "input_type": "password",
+        "selector": "#password",
+        "snapshot_hash": "axtree-hash-002",
+        "delta_from": "web-span-002"
+      }
+    },
+    {
+      "span_id": "web-span-004",
+      "trace_id": "trace-web-session-008",
+      "sequence": 4,
+      "kind": "api_call",
+      "started_at": "2026-07-30T02:00:04Z",
+      "ended_at": "2026-07-30T02:00:06Z",
+      "duration_ms": 2000,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "navigational",
+      "interaction": {
+        "target": "click Submit",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Login successful — redirected to dashboard"
+        }
+      },
+      "observation": {
+        "what_happened": "Clicked Submit button. Page redirected to dashboard after 2s load.",
+        "what_learned": "Login flow completes with redirect to /dashboard. Session cookie set. No MFA challenge on this account.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Username and password entered"],
+        "postconditions": ["Authenticated, on dashboard page"],
+        "state_changes": ["auth state: unauthenticated → authenticated", "page: login → dashboard"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-003"],
+        "enables": ["web-span-005"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "login", "auth", "state_transition"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.example.com/dashboard",
+        "page_title": "Dashboard — Overview",
+        "action": "click",
+        "element_role": "button",
+        "element_name": "Submit",
+        "selector": "#submit-btn",
+        "snapshot_hash": "axtree-hash-003"
+      },
+      "contains_contexts": [
+        {
+          "modality": "api",
+          "relationship": "triggers",
+          "active": true,
+          "description": "Submit button triggers POST /auth/login API call"
+        }
+      ]
+    },
+    {
+      "span_id": "web-span-005",
+      "trace_id": "trace-web-session-008",
+      "sequence": 5,
+      "kind": "api_call",
+      "started_at": "2026-07-30T02:00:06Z",
+      "ended_at": "2026-07-30T02:00:07Z",
+      "duration_ms": 800,
+      "modality": "web",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "navigational",
+      "interaction": {
+        "target": "click Transactions",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Transactions page loaded with table showing 50 recent transactions"
+        }
+      },
+      "observation": {
+        "what_happened": "Clicked Transactions link in sidebar navigation. Page loaded with transaction table.",
+        "what_learned": "Dashboard sidebar has 5 nav links: Overview, Transactions, Accounts, Settings, Logout. Transaction table shows 50 rows with pagination.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["Authenticated on dashboard"],
+        "postconditions": ["Viewing transactions page"],
+        "state_changes": ["page: dashboard → transactions"]
+      },
+      "relationships": {
+        "depends_on": ["web-span-004"],
+        "enables": ["web-span-006"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "navigation", "transactions"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.example.com/transactions",
+        "page_title": "Transactions — Dashboard",
+        "action": "click",
+        "element_role": "link",
+        "element_name": "Transactions",
+        "selector": "nav a[href='/transactions']",
+        "snapshot_hash": "axtree-hash-004"
+      },
+      "contains_contexts": [
+        {
+          "modality": "api",
+          "relationship": "triggers",
+          "active": true,
+          "description": "Navigation triggers GET /api/transactions API call"
+        },
+        {
+          "modality": "db",
+          "relationship": "reads_from",
+          "active": true,
+          "description": "API fetches from transactions table"
+        }
+      ]
+    },
+    {
+      "span_id": "web-span-006",
+      "trace_id": "trace-web-session-008",
+      "sequence": 6,
+      "kind": "api_call",
+      "started_at": "2026-07-30T02:00:07Z",
+      "ended_at": "2026-07-30T02:00:08Z",
+      "duration_ms": 100,
+      "modality": "web",
+      "request_intent": "query",
+      "response_outcome": "success",
+      "signal_class": "noise",
+      "delta_from_prior": "none",
+      "span_structure": "navigational",
+      "interaction": {
+        "target": "observe transactions page",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "No change from previous snapshot — page is stable"
+        }
+      },
+      "observation": {
+        "what_happened": "Observed transactions page state — no changes detected.",
+        "what_learned": "Page is stable after load. AXTree hash unchanged from span-005. Good candidate for delta compression.",
+        "confidence": "high"
+      },
+      "state": {
+        "preconditions": ["On transactions page"],
+        "postconditions": ["Page state confirmed stable"],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": ["web-span-005"],
+        "enables": ["web-span-007"],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "observe", "compression"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.example.com/transactions",
+        "page_title": "Transactions — Dashboard",
+        "action": "observe",
+        "snapshot_hash": "axtree-hash-004",
+        "delta_from": "web-span-005"
+      },
+      "compression_ratio": 0.0
+    },
+    {
+      "span_id": "web-span-007",
+      "trace_id": "trace-web-session-008",
+      "sequence": 7,
+      "kind": "api_call",
+      "started_at": "2026-07-30T02:00:08Z",
+      "ended_at": "2026-07-30T02:00:10Z",
+      "duration_ms": 1500,
+      "modality": "web",
+      "request_intent": "mutation",
+      "response_outcome": "error",
+      "signal_class": "intent_carrying",
+      "delta_from_prior": "full",
+      "span_structure": "navigational",
+      "interaction": {
+        "target": "click Export CSV",
+        "method": null,
+        "request": {},
+        "response": {
+          "body_summary": "Export button click failed — element became stale during page refresh",
+          "error": "stale_element"
+        }
+      },
+      "observation": {
+        "what_happened": "Attempted to click Export CSV button but element reference went stale during a background page refresh.",
+        "what_learned": "Dashboard has auto-refresh that can invalidate element references. Need to re-query AXTree before interacting after idle periods.",
+        "confidence": "high",
+        "surprises": "Auto-refresh interval is very short — element went stale in <2 seconds",
+        "questions_raised": ["What is the auto-refresh interval?", "Can auto-refresh be paused during interaction?"]
+      },
+      "state": {
+        "preconditions": ["On transactions page", "Export CSV button visible"],
+        "postconditions": ["Export failed — no file downloaded"],
+        "state_changes": []
+      },
+      "relationships": {
+        "depends_on": ["web-span-006"],
+        "enables": [],
+        "contradicts": [],
+        "refines": []
+      },
+      "tags": ["web", "error", "stale_element", "export"],
+      "modality_ext": {
+        "type": "web_ext",
+        "page_url": "https://dashboard.example.com/transactions",
+        "page_title": "Transactions — Dashboard",
+        "action": "click",
+        "element_role": "button",
+        "element_name": "Export CSV",
+        "selector": "#export-csv-btn",
+        "snapshot_hash": "axtree-hash-005"
+      },
+      "expected_outcome": {"description": "CSV file download starts", "confidence": 0.8},
+      "actual_outcome": {"description": "stale_element — button reference invalidated by auto-refresh"},
+      "divergence_score": 0.9
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-web-001",
+      "trace_id": "trace-web-session-008",
+      "source_spans": ["web-span-003"],
+      "category": "compliance",
+      "title": "Password field input correctly masked in trace",
+      "description": "Password input_value is stored as '***' in the trace, confirming privacy masking works for type=password fields. No sensitive data leaks into trace storage.",
+      "evidence": ["web-span-003"],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": ["web", "privacy", "compliance"]
+    },
+    {
+      "finding_id": "finding-web-002",
+      "trace_id": "trace-web-session-008",
+      "source_spans": ["web-span-007"],
+      "category": "error_pattern",
+      "title": "Auto-refresh causes stale element references during interaction",
+      "description": "Dashboard auto-refresh invalidates element references within 2 seconds of idle. Export CSV button went stale before click could complete. Mitigation: re-query AXTree immediately before interaction, or pause auto-refresh during agent interaction windows.",
+      "evidence": ["web-span-006", "web-span-007"],
+      "confidence": "confirmed",
+      "actionability": "immediate",
+      "related_findings": [],
+      "tags": ["web", "error", "stale_element", "auto-refresh"]
+    },
+    {
+      "finding_id": "finding-web-003",
+      "trace_id": "trace-web-session-008",
+      "source_spans": ["web-span-004", "web-span-005"],
+      "category": "cross_modality",
+      "title": "Web→API→DB chain confirmed via contains_contexts",
+      "description": "Login button click triggers POST /auth/login (API), and Transactions link triggers GET /api/transactions (API) which reads from DB. Full-stack trace chain: Web mutation → API query → DB read. Intent transforms across boundaries as expected.",
+      "evidence": ["web-span-004", "web-span-005"],
+      "confidence": "confirmed",
+      "actionability": "informational",
+      "related_findings": [],
+      "tags": ["web", "cross-modality", "api", "db"]
+    }
+  ],
+  "metadata": {}
+}

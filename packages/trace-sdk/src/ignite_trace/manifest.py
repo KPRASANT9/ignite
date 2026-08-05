@@ -25,6 +25,7 @@ class ManifestTarget:
     description: str = ""
     expected_findings: list[str] = field(default_factory=list)
     endpoints: list[str] = field(default_factory=list)
+    modality: str = "api"  # "api", "db", "cli", "web", "message", "custom"
     status: str = "unexplored"  # "unexplored", "in_progress", "completed"
     trace_id: str | None = None  # links to the trace that covered this target
 
@@ -63,6 +64,7 @@ class ExplorationManifest:
                 description=t.get("description", ""),
                 expected_findings=t.get("expected_findings", []),
                 endpoints=t.get("endpoints", []),
+                modality=t.get("modality", "api"),
                 status=t.get("status", "unexplored"),
                 trace_id=t.get("trace_id"),
             ))
@@ -83,6 +85,7 @@ class ExplorationManifest:
                 description=t.get("description", ""),
                 expected_findings=t.get("expected_findings", []),
                 endpoints=t.get("endpoints", []),
+                modality=t.get("modality", "api"),
                 status=t.get("status", "unexplored"),
                 trace_id=t.get("trace_id"),
             ))
