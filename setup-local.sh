@@ -74,7 +74,7 @@ echo "Step 3: Verifying Python setup..."
 .venv/bin/python -c "
 from ignite_bridge.app import create_app
 from ignite_parser import parse_trace, detect_spikes
-from ignite_trace import Span
+from ignite_trace import span
 print('  All Python packages OK ✓')
 "
 
@@ -83,25 +83,29 @@ echo "Step 4: Installing extension (Node.js) dependencies..."
 
 cd "$REPO_ROOT/packages/extension"
 
-# Install all npm packages (allow scripts so sharp builds natively)
+# Install all npm packages
 echo "  Running npm install..."
 npm install --cache /tmp/npm-cache-ignite 2>&1 | tail -5
 
-# If npm install failed on native modules, retry without scripts
+# Verify plasmo is installed
 if [ ! -d "node_modules/plasmo" ]; then
     echo "  Retrying with --ignore-scripts..."
     npm install --ignore-scripts --cache /tmp/npm-cache-ignite 2>&1 | tail -3
 fi
 
-# Verify plasmo is installed
-if [ -f "node_modules/plasmo/dist/index.mjs" ]; then
-    echo "  Plasmo installed ✓"
-else
+if [ ! -d "node_modules/plasmo" ]; then
     echo "  ERROR: Plasmo not found in node_modules."
     echo "  Try running manually: cd packages/extension && npm install"
     cd "$REPO_ROOT"
     exit 1
 fi
+
+echo "  Plasmo installed ✓"
+
+# Rebuild sharp native module (required for plasmo icon processing)
+echo "  Rebuilding sharp native module..."
+npm rebuild sharp 2>&1 | tail -3
+echo "  Sharp rebuilt ✓"
 
 # --- Step 5: Build the extension ---
 echo "Step 5: Building Chrome extension..."
