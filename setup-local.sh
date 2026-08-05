@@ -10,24 +10,55 @@ echo ""
 # --- Prerequisites check ---
 echo "Checking prerequisites..."
 
-command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not found. Install Python 3.11+"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "ERROR: node not found. Install Node.js 18+"; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "ERROR: npm not found. Install Node.js 18+"; exit 1; }
 
-PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+# Find Python 3.11+ — macOS ships 3.9 at /usr/bin/python3 which is too old.
+# Try specific versions first, then fall back to python3.
+PYTHON=""
+for candidate in python3.12 python3.11 python3; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+        ver=$("$candidate" -c "import sys; print(sys.version_info.minor)")
+        major=$("$candidate" -c "import sys; print(sys.version_info.major)")
+        if [ "$major" = "3" ] && [ "$ver" -ge 11 ]; then
+            PYTHON=$(command -v "$candidate")
+            break
+        fi
+    fi
+done
+
+if [ -z "$PYTHON" ]; then
+    echo "ERROR: Python 3.11+ not found."
+    echo "  Your system python3 is $(python3 --version 2>&1), which is too old."
+    echo "  Install Python 3.12 via Homebrew:"
+    echo "    brew install python@3.12"
+    echo "  Then re-run this script."
+    exit 1
+fi
+
+PYTHON_VERSION=$("$PYTHON" --version)
 NODE_VERSION=$(node -v)
-echo "  Python: $PYTHON_VERSION"
+echo "  Python: $PYTHON_VERSION ($PYTHON)"
 echo "  Node:   $NODE_VERSION"
 echo ""
 
 # --- Step 1: Python virtual environment ---
 echo "Step 1: Setting up Python virtual environment..."
 
-if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
-    echo "  Created .venv"
+if [ -d ".venv" ]; then
+    # Check if existing venv has the right Python version
+    VENV_VER=$(.venv/bin/python -c "import sys; print(sys.version_info.minor)" 2>/dev/null || echo "0")
+    if [ "$VENV_VER" -lt 11 ]; then
+        echo "  Existing .venv uses Python 3.$VENV_VER (too old). Recreating with $PYTHON..."
+        rm -rf .venv
+        "$PYTHON" -m venv .venv
+        echo "  Recreated .venv with $PYTHON_VERSION"
+    else
+        echo "  .venv already exists (Python 3.$VENV_VER)"
+    fi
 else
-    echo "  .venv already exists"
+    "$PYTHON" -m venv .venv
+    echo "  Created .venv with $PYTHON_VERSION"
 fi
 
 # --- Step 2: Install Python packages ---
