@@ -84,14 +84,51 @@ print('  All Python packages OK')
 echo "Step 4: Installing extension (Node.js) dependencies..."
 
 cd packages/extension
-npm install --ignore-scripts --cache /tmp/npm-cache-ignite 2>/dev/null
-echo "  Node modules installed"
+
+# First pass: install everything except native modules that may fail
+npm install --ignore-scripts --cache /tmp/npm-cache-ignite 2>&1 | grep -E "^(npm ERR|added|up to date)" || true
+echo "  Base packages installed"
+
+# Second pass: rebuild sharp (required by plasmo for icon generation)
+# Install sharp for the current platform inside plasmo's nested copy
+if [ -d "node_modules/plasmo/node_modules/sharp" ]; then
+    echo "  Rebuilding sharp for plasmo..."
+    (cd node_modules/plasmo/node_modules/sharp && npm install --platform=darwin --arch=x64 --cache /tmp/npm-cache-ignite 2>&1 | tail -1) || true
+fi
+# Also install sharp at top level as fallback
+npm install --platform=darwin --arch=x64 sharp --cache /tmp/npm-cache-ignite 2>&1 | grep -E "^(npm ERR|added|up to date)" || true
+echo "  Sharp module ready"
 
 # --- Step 5: Build the extension ---
 echo "Step 5: Building Chrome extension..."
 
-npx plasmo build 2>/dev/null
-echo "  Extension built at: packages/extension/build/chrome-mv3-prod/"
+# Ensure icon exists (plasmo requires it)
+if [ ! -f "assets/icon.png" ]; then
+    mkdir -p assets
+    "$PYTHON" -c "
+import struct, zlib
+def png(size, r, g, b):
+    raw = b''
+    for y in range(size):
+        raw += b'\x00'
+        for x in range(size): raw += bytes([r, g, b, 255])
+    def chunk(t, d):
+        c = t + d
+        return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+    ihdr = struct.pack('>IIBBBBB', size, size, 8, 6, 0, 0, 0)
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
+with open('assets/icon.png', 'wb') as f: f.write(png(128, 255, 107, 0))
+"
+    echo "  Created extension icon"
+fi
+
+npx plasmo build 2>&1 | tail -5
+if [ -f "build/chrome-mv3-prod/manifest.json" ]; then
+    echo "  ✅ Extension built at: packages/extension/build/chrome-mv3-prod/"
+else
+    echo "  ❌ Build failed! Run manually to see errors:"
+    echo "    cd packages/extension && npx plasmo build"
+fi
 cd ../..
 
 # --- Step 6: Run Python tests ---
