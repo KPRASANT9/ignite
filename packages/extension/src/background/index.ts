@@ -122,10 +122,13 @@ async function handleGitHubOAuth(config: GitHubOAuthConfig) {
 async function handleTraceCapture(trace: Record<string, unknown>) {
   const bridgeUrl = await getBridgeUrl()
   try {
-    const res = await fetch(`${bridgeUrl}/traces`, {
+    const res = await fetch(`${bridgeUrl}/traces/web`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(trace),
+      body: JSON.stringify({
+        spans: [trace],
+        system: (trace.system as string) || "unknown",
+      }),
     })
     const data = await res.json()
     if (data.spikes?.length > 0) {
