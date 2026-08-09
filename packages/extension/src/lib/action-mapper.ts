@@ -107,6 +107,123 @@ function mapSingleAction(
         },
       }
 
+    case "reduce_rate":
+      return {
+        label: "Reduce capture rate",
+        description: "Throttle trace capture to stay within rate limits",
+        handler: async () => {
+          return chrome.runtime.sendMessage({
+            type: "MCP_INVOKE",
+            system,
+            archetype: "mcp-ratelimit",
+            tool: "check_budget",
+            params: { system },
+          })
+        },
+      }
+
+    case "increase_timeout":
+      return {
+        label: "Increase timeout",
+        description: "Retry with extended timeout for slow endpoints",
+        handler: async () => {
+          return chrome.runtime.sendMessage({
+            type: "MCP_INVOKE",
+            system,
+            archetype,
+            tool: "invoke",
+            params: { system, timeout_ms: 30000 },
+          })
+        },
+      }
+
+    case "investigate":
+      return {
+        label: "Investigate",
+        description: "Analyze endpoint behavior and recent errors",
+        handler: async () => {
+          return chrome.runtime.sendMessage({
+            type: "MCP_INVOKE",
+            system,
+            archetype,
+            tool: "analyze_latency",
+            params: { system },
+          })
+        },
+      }
+
+    case "log_escalate":
+      return {
+        label: "Log & escalate",
+        description: "Record the error and flag for manual review",
+        handler: async () => {
+          await chrome.runtime.sendMessage({
+            type: "SHOW_SIDE_PANEL",
+            focus: "spike",
+          })
+          return { escalated: true, logged: true }
+        },
+      }
+
+    case "check_idempotency":
+      return {
+        label: "Check idempotency",
+        description: "Verify if the failed mutation can be safely retried",
+        handler: async () => {
+          return chrome.runtime.sendMessage({
+            type: "MCP_INVOKE",
+            system,
+            archetype,
+            tool: "invoke",
+            params: { system, check: "idempotency" },
+          })
+        },
+      }
+
+    case "monitor_outcome":
+      return {
+        label: "Monitor",
+        description: "Watch this state transition for anomalies",
+        handler: async () => {
+          // No-op for P1 — logs the intent, monitoring infra in P2
+          console.log(`[IGNITE] Monitoring outcome for ${system}`)
+          return { monitoring: true }
+        },
+      }
+
+    case "log_transition":
+      return {
+        label: "Log transition",
+        description: "Record this state transition in trace history",
+        handler: async () => {
+          console.log(`[IGNITE] State transition logged for ${system}`)
+          return { logged: true }
+        },
+      }
+
+    case "log_pattern":
+      return {
+        label: "Log pattern",
+        description: "Record this cross-modality pattern",
+        handler: async () => {
+          console.log(`[IGNITE] Cross-modality pattern logged for ${system}`)
+          return { logged: true }
+        },
+      }
+
+    case "alert_human":
+      return {
+        label: "Alert",
+        description: "Surface this issue for human attention",
+        handler: async () => {
+          await chrome.runtime.sendMessage({
+            type: "SHOW_SIDE_PANEL",
+            focus: "spike",
+          })
+          return { alerted: true }
+        },
+      }
+
     default:
       return null
   }

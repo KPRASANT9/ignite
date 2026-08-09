@@ -59,7 +59,8 @@ export function evaluateTransition(
 
     case "auth_failure":
       if (current.state === "CONNECTING") {
-        if (current.authFailures + 1 >= MAX_AUTH_FAILURES) return "IDLE"
+        // authFailures is already incremented before guard evaluation
+        if (current.authFailures >= MAX_AUTH_FAILURES) return "IDLE"
       }
       if (current.state === "ACTIVE") return "CONNECTING"
       return null
@@ -125,10 +126,9 @@ export function applyTransition(
   current: SystemOnboardingRecord,
   event: TransitionEvent,
 ): SystemOnboardingRecord {
-  const newState = evaluateTransition(systemId, current, event)
-
   const updated = { ...current }
 
+  // Apply side-effects BEFORE guard evaluation so guards see updated values
   if (event.type === "trace_captured") {
     updated.traces += 1
     if (updated.traces >= updated.threshold && updated.state === "PROFILING") {
@@ -145,6 +145,9 @@ export function applyTransition(
   if (event.type === "confidence_drop" && event.payload?.confidence !== undefined) {
     updated.confidence = event.payload.confidence as number
   }
+
+  // Evaluate guard AFTER side-effects so it sees the new confidence/authFailures
+  const newState = evaluateTransition(systemId, updated, event)
 
   if (newState !== null) {
     updated.state = newState

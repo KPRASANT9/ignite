@@ -5,7 +5,7 @@
  * Used by the service worker and side panel.
  */
 
-import { storeCredential as vaultStore, getCredential as vaultGet, deleteCredential as vaultDelete, type VaultRecord } from "./vault"
+import { storeCredential as vaultStore, getCredential as vaultGet, deleteCredential as vaultDelete, type VaultRecord, type TriggerMode } from "./vault"
 
 const DEFAULT_BRIDGE_URL = "http://localhost:8400"
 
@@ -96,12 +96,14 @@ export async function storeSystemCredential(
   token: string,
   scopes: string[],
   tier = "user",
+  mode: TriggerMode = "push",
   expiresAt: string | null = null,
 ): Promise<void> {
   await vaultStore({
     system,
     archetype,
     tier,
+    mode,
     token,
     scopes,
     granted_at: new Date().toISOString(),

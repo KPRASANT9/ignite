@@ -11,10 +11,13 @@ const CREDENTIALS_STORE = "credentials"
 const META_STORE = "meta"
 const PBKDF2_ITERATIONS = 600_000
 
+export type TriggerMode = "pull" | "push" | "autonomous"
+
 export interface VaultRecord {
   system: string
   archetype: string
   tier: string
+  mode: TriggerMode
   token: string
   scopes: string[]
   granted_at: string
@@ -25,6 +28,7 @@ export interface EncryptedVaultRecord {
   system: string
   archetype: string
   tier: string
+  mode: TriggerMode
   ciphertext: ArrayBuffer
   iv: Uint8Array
   scopes: string[]
@@ -162,6 +166,7 @@ export async function storeCredential(record: VaultRecord): Promise<void> {
     system: record.system,
     archetype: record.archetype,
     tier: record.tier,
+    mode: record.mode,
     ciphertext,
     iv,
     scopes: record.scopes,
@@ -184,6 +189,7 @@ export async function getCredential(system: string, archetype: string): Promise<
     system: encrypted.system,
     archetype: encrypted.archetype,
     tier: encrypted.tier,
+    mode: encrypted.mode || "push",
     token,
     scopes: encrypted.scopes,
     granted_at: encrypted.granted_at,
@@ -210,10 +216,11 @@ export async function listCredentials(): Promise<
   const db = await openDB()
   const all = await idbGetAll<EncryptedVaultRecord>(db, CREDENTIALS_STORE)
   db.close()
-  return all.map(({ system, archetype, tier, scopes, granted_at, expires_at }) => ({
+  return all.map(({ system, archetype, tier, mode, scopes, granted_at, expires_at }) => ({
     system,
     archetype,
     tier,
+    mode: mode || "push",
     scopes,
     granted_at,
     expires_at,
