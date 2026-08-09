@@ -1,30 +1,21 @@
 /**
  * IGNITE Service Worker (background script).
  *
- * Manages: OnboardingFSM, ProfileManager, BCI Engine, MCP Gateway routing.
+ * Manages: BCIEngine, OnboardingFSM, MCP Gateway routing.
  * Persists state to chrome.storage.local (service worker terminates when idle).
  *
  * Receives messages from content scripts via chrome.runtime.onMessage.
  * Relays traces to the Python L2 bridge via REST POST.
  */
 
-import { detectSystem } from "~/lib/systems"
 import {
   applyTransition,
   createRecord,
   type OnboardingStore,
-  type TransitionEvent,
 } from "~/lib/onboarding-fsm"
 import { authenticateGitHub, type GitHubOAuthConfig } from "~/lib/github-oauth"
-import { storeSystemCredential, subscribeSpikeStream, type SpikeSignal } from "~/lib/bridge-client"
-import { ingestTrace } from "~/lib/bridge-client"
-import {
-  spikeToTransitionEvents,
-  createFsmTransitionSpan,
-  serializeConfidenceStates,
-  restoreConfidenceStates,
-  type SerializedConfidenceState,
-} from "~/lib/spike-to-fsm"
+import { storeSystemCredential } from "~/lib/bridge-client"
+import { BCIEngine } from "~/lib/bci-engine"
 
 export {}
 
@@ -33,6 +24,18 @@ export {}
 async function getBridgeUrl(): Promise<string> {
   const result = await chrome.storage.sync.get("bridgeUrl")
   return result.bridgeUrl || "http://localhost:8400"
+}
+
+// --- BCIEngine singleton ---
+
+let engine: BCIEngine | null = null
+
+async function getEngine(): Promise<BCIEngine> {
+  if (!engine) {
+    const bridgeUrl = await getBridgeUrl()
+    engine = new BCIEngine({ bridgeUrl })
+  }
+  return engine
 }
 
 // --- Message handling from content scripts ---
@@ -189,7 +192,7 @@ async function saveOnboardingStore(store: OnboardingStore): Promise<void> {
   await chrome.storage.local.set({ onboarding: store })
 }
 
-// --- Periodic health check ---
+// --- Periodic health check + BCIEngine lifecycle ---
 
 chrome.alarms.create("bridge-health", { periodInMinutes: 1 })
 
@@ -200,100 +203,35 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       const res = await fetch(`${bridgeUrl}/health`)
       const healthy = res.ok
       await chrome.storage.local.set({ bridgeHealthy: healthy })
-      // Start spike stream if bridge is healthy and not already connected
-      if (healthy && !spikeStreamActive) {
-        startSpikeStream()
+
+      // Start BCIEngine if bridge is healthy
+      if (healthy) {
+        const eng = await getEngine()
+        if (!eng.isActive) {
+          await eng.reconfigure(bridgeUrl)
+          await eng.start()
+        }
       }
     } catch {
       await chrome.storage.local.set({ bridgeHealthy: false })
     }
+    return
   }
+
+  // Delegate alarm to BCIEngine (webRequest flush, etc.)
+  const eng = await getEngine()
+  await eng.handleAlarm(alarm)
 })
 
-// --- BCI Spike Stream: subscribe to bridge SSE and drive FSM ---
+// --- Startup: attempt BCIEngine connection ---
 
-let spikeStreamActive = false
-let stopSpikeStream: (() => void) | null = null
-
-async function startSpikeStream() {
-  if (spikeStreamActive) return
-
-  // Restore confidence state from storage
-  const stored = await chrome.storage.local.get("confidenceStates")
-  if (stored.confidenceStates) {
-    restoreConfidenceStates(
-      stored.confidenceStates as Record<string, SerializedConfidenceState>,
-    )
-  }
-
-  const bridgeUrl = await getBridgeUrl()
-  spikeStreamActive = true
-
-  stopSpikeStream = subscribeSpikeStream(
-    async (spike: SpikeSignal) => {
-      await handleSpikeSignal(spike)
-    },
-    bridgeUrl,
-  )
-
-  console.log("[IGNITE] BCI spike stream connected")
-}
-
-async function handleSpikeSignal(spike: SpikeSignal) {
-  const systemId = spike.source_system
-  if (!systemId || systemId === "unknown") return
-
-  const store = await getOnboardingStore()
-  if (!store.systems[systemId]) {
-    // Auto-create record for newly detected system via spike
-    store.systems[systemId] = createRecord()
-  }
-
-  const currentRecord = store.systems[systemId]
-  const previousState = currentRecord.state
-
-  // Translate spike into FSM transition events
-  const events = spikeToTransitionEvents(spike, currentRecord)
-
-  // Apply each event sequentially
-  let record = currentRecord
-  for (const event of events) {
-    record = applyTransition(systemId, record, event)
-  }
-
-  store.systems[systemId] = record
-  await saveOnboardingStore(store)
-
-  // Persist confidence state
-  await chrome.storage.local.set({
-    confidenceStates: serializeConfidenceStates(),
-  })
-
-  // Self-tracing: if state changed, emit FSM transition span back through bridge
-  if (record.state !== previousState) {
-    console.log(
-      `[IGNITE] FSM transition: ${systemId} ${previousState} → ${record.state}`,
-    )
-    const selfSpan = createFsmTransitionSpan(
-      systemId,
-      previousState,
-      record.state,
-      spike,
-    )
-    const bridgeUrl = await getBridgeUrl()
-    try {
-      await ingestTrace(selfSpan, bridgeUrl)
-    } catch {
-      // Self-tracing is best-effort — don't block FSM on bridge failure
-    }
-  }
-}
-
-// Start spike stream on service worker startup
 getBridgeUrl()
-  .then((url) => fetch(`${url}/health`))
-  .then((res) => {
-    if (res.ok) startSpikeStream()
+  .then(async (url) => {
+    const res = await fetch(`${url}/health`)
+    if (res.ok) {
+      const eng = await getEngine()
+      await eng.start()
+    }
   })
   .catch(() => {
     // Bridge not available yet — alarm will retry
