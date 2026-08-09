@@ -159,6 +159,9 @@ export class BCIEngine {
         // Don't let handler errors break the pipeline
       }
     }
+
+    // Broadcast to content script overlays on all tabs
+    this.broadcastToOverlays(spike)
   }
 
   /**
@@ -347,6 +350,27 @@ export class BCIEngine {
       return true
     }
     return false
+  }
+
+  // --- Overlay Broadcasting ---
+
+  /**
+   * Broadcast spike signals to content script overlays on all tabs.
+   * The ActionOverlay CSUI listens for OVERLAY_SPIKE messages.
+   */
+  private broadcastToOverlays(spike: SpikeSignal): void {
+    chrome.tabs.query({}, (tabs) => {
+      for (const tab of tabs) {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: "OVERLAY_SPIKE",
+            spike,
+          }).catch(() => {
+            // Tab may not have content script — ignore
+          })
+        }
+      }
+    })
   }
 
   // --- Helpers ---
