@@ -28,7 +28,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from ignite_parser.analyzer import EndpointRecord, analyze
 from ignite_parser.models import Trace
 from ignite_parser.parser import parse_trace
-from ignite_parser.spike import SpikeSignal, detect_spikes
+from ignite_parser.spike import SpikeSignal, detect_spikes, correlate_spans, compute_correlation_boost, classify_signal
+from ignite_parser.optimizer import optimize, ExtractedFSM
 
 
 # --- In-memory state ---
@@ -42,6 +43,28 @@ _recent_traces: deque[Trace] = deque(maxlen=100)
 # P1: only mcp-sync tools for GitHub.
 
 _mcp_tools: dict[tuple[str, str], list[dict]] = {
+    # --- Wildcard archetypes (available for all systems) ---
+    ("*", "mcp-fsm"): [
+        {"name": "extract_fsm", "description": "Extract FSMs from recent traces", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+        {"name": "get_states", "description": "List states of extracted FSM", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+        {"name": "get_transitions", "description": "List transitions of extracted FSM", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+    ],
+    ("*", "mcp-async"): [
+        {"name": "correlate_spans", "description": "Correlate spans across modalities", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}, "window_ms": {"type": "number"}}, "required": ["system"]}},
+        {"name": "get_temporal_patterns", "description": "Analyze temporal patterns", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}, "window_minutes": {"type": "number"}}, "required": ["system"]}},
+        {"name": "detect_cadence", "description": "Detect request cadence stability", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+    ],
+    ("*", "mcp-scoring"): [
+        {"name": "compute_boost", "description": "Compute cross-modality correlation boost", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+        {"name": "score_system", "description": "Score overall system health", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+        {"name": "get_modality_coverage", "description": "List observed modalities and signal rates", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+    ],
+    ("*", "mcp-orchestration"): [
+        {"name": "generate_plan", "description": "Generate execution plan from traces", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}, "objective": {"type": "string"}}, "required": ["system"]}},
+        {"name": "get_execution_order", "description": "Get topologically-sorted execution order", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+        {"name": "validate_plan", "description": "Validate plan for circular dependencies", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+    ],
+    # --- System-specific archetypes ---
     ("github", "mcp-sync"): [
         {
             "name": "invoke",
@@ -291,8 +314,10 @@ def create_app() -> FastAPI:
         body = await request.json()
         system = body.get("system", "")
         archetype = body.get("archetype", "")
-        key = (system.lower(), archetype.lower())
-        tools = _mcp_tools.get(key, [])
+        # Check system-specific first, then wildcard
+        tools = _mcp_tools.get((system.lower(), archetype.lower()), [])
+        if not tools:
+            tools = _mcp_tools.get(("*", archetype.lower()), [])
         return JSONResponse(content={"tools": tools, "count": len(tools)})
 
     @app.post("/mcp/tools/call")
@@ -309,9 +334,11 @@ def create_app() -> FastAPI:
         tool_name = body.get("tool", "")
         arguments = body.get("arguments", {})
 
-        # Validate tool exists
+        # Validate tool exists (check system-specific, then wildcard)
         key = (system.lower(), archetype.lower())
         tools = _mcp_tools.get(key, [])
+        if not tools:
+            tools = _mcp_tools.get(("*", archetype.lower()), [])
         tool_def = next((t for t in tools if t["name"] == tool_name), None)
         if tool_def is None:
             return JSONResponse(
@@ -322,12 +349,23 @@ def create_app() -> FastAPI:
         # Forward auth header from extension → downstream API
         auth_header = request.headers.get("Authorization", "")
 
-        # Route by system
+        # Route by archetype first (wildcard handlers), then by system
+        archetype_lower = archetype.lower()
+        if archetype_lower == "mcp-fsm":
+            return _handle_fsm_mcp(tool_name, arguments)
+        if archetype_lower == "mcp-async":
+            return _handle_async_mcp(tool_name, arguments)
+        if archetype_lower == "mcp-scoring":
+            return _handle_scoring_mcp(tool_name, arguments)
+        if archetype_lower == "mcp-orchestration":
+            return _handle_orchestration_mcp(tool_name, arguments)
+
+        # System-specific routing
         if system.lower() == "github":
             return await _handle_github_mcp(tool_name, arguments, auth_header)
 
         return JSONResponse(
-            content={"error": f"No handler for system: {system}"},
+            content={"error": f"No handler for system: {system}, archetype: {archetype}"},
             status_code=501,
         )
 
@@ -400,3 +438,242 @@ async def _handle_github_mcp(tool_name: str, arguments: dict, auth_header: str) 
             return JSONResponse(content={"endpoint": endpoint_pattern, "matches": len(matching_durations), "stats": stats})
 
     return JSONResponse(content={"error": f"Unknown tool: {tool_name}"}, status_code=400)
+
+
+# --- mcp-fsm handlers (place coding) ---
+
+def _handle_fsm_mcp(tool_name: str, arguments: dict) -> JSONResponse:
+    """Handle mcp-fsm tool invocations — wraps L2 optimizer FSM extraction."""
+    traces = list(_recent_traces)
+    system = arguments.get("system", "")
+
+    if not traces:
+        return JSONResponse(content={"fsms": [], "message": "No traces available for FSM extraction"})
+
+    # Run optimizer to extract FSMs
+    from ignite_parser.analyzer import analyze
+    analysis = analyze(traces)
+    optimized = optimize(analysis, traces)
+
+    fsms = optimized.fsms if hasattr(optimized, "fsms") else []
+
+    if tool_name == "extract_fsm":
+        return JSONResponse(content={
+            "fsms": [
+                {
+                    "name": f.name,
+                    "system": f.system,
+                    "state_count": f.state_count,
+                    "transition_count": f.transition_count,
+                    "states": [{"name": s.name, "is_initial": s.is_initial, "is_terminal": s.is_terminal, "is_error": s.is_error} for s in f.states],
+                    "transitions": [{"from_state": t.from_state, "to_state": t.to_state, "trigger": t.trigger} for t in f.transitions],
+                }
+                for f in fsms
+            ],
+            "count": len(fsms),
+        })
+
+    if tool_name == "get_states":
+        all_states = []
+        for f in fsms:
+            for s in f.states:
+                all_states.append({"fsm": f.name, "name": s.name, "is_initial": s.is_initial, "is_terminal": s.is_terminal, "is_error": s.is_error})
+        return JSONResponse(content={"states": all_states, "count": len(all_states)})
+
+    if tool_name == "get_transitions":
+        all_transitions = []
+        for f in fsms:
+            for t in f.transitions:
+                all_transitions.append({"fsm": f.name, "from_state": t.from_state, "to_state": t.to_state, "trigger": t.trigger})
+        return JSONResponse(content={"transitions": all_transitions, "count": len(all_transitions)})
+
+    return JSONResponse(content={"error": f"Unknown mcp-fsm tool: {tool_name}"}, status_code=400)
+
+
+# --- mcp-async handlers (temporal coding) ---
+
+def _handle_async_mcp(tool_name: str, arguments: dict) -> JSONResponse:
+    """Handle mcp-async tool invocations — wraps L2 temporal correlation."""
+    traces = list(_recent_traces)
+    system = arguments.get("system", "")
+
+    if not traces:
+        return JSONResponse(content={"groups": [], "message": "No traces available"})
+
+    all_spans = [span for trace in traces for span in trace.spans]
+
+    if tool_name == "correlate_spans":
+        window_ms = arguments.get("window_ms", 5000)
+        groups = correlate_spans(all_spans, window_ms=window_ms)
+        return JSONResponse(content={
+            "groups": [
+                {
+                    "span_count": len(group),
+                    "modalities": list({s.modality for s in group if s.modality}),
+                    "trace_ids": list({s.trace_id for s in group if s.trace_id}),
+                }
+                for group in groups
+            ],
+            "total_groups": len(groups),
+            "window_ms": window_ms,
+        })
+
+    if tool_name == "get_temporal_patterns":
+        # Analyze timing intervals between spans
+        timestamps = sorted([s.started_at for s in all_spans if s.started_at])
+        intervals = []
+        for i in range(1, len(timestamps)):
+            try:
+                from datetime import datetime
+                t1 = datetime.fromisoformat(timestamps[i - 1].replace("Z", "+00:00"))
+                t2 = datetime.fromisoformat(timestamps[i].replace("Z", "+00:00"))
+                intervals.append((t2 - t1).total_seconds() * 1000)
+            except (ValueError, TypeError):
+                pass
+        avg_interval = sum(intervals) / len(intervals) if intervals else 0
+        variance = sum((x - avg_interval) ** 2 for x in intervals) / len(intervals) if intervals else 0
+        return JSONResponse(content={
+            "span_count": len(all_spans),
+            "interval_count": len(intervals),
+            "avg_interval_ms": round(avg_interval, 1),
+            "variance_ms2": round(variance, 1),
+            "is_stable": variance < (avg_interval ** 2 * 0.1) if avg_interval > 0 else False,
+        })
+
+    if tool_name == "detect_cadence":
+        timestamps = sorted([s.started_at for s in all_spans if s.started_at])
+        intervals = []
+        for i in range(1, len(timestamps)):
+            try:
+                from datetime import datetime
+                t1 = datetime.fromisoformat(timestamps[i - 1].replace("Z", "+00:00"))
+                t2 = datetime.fromisoformat(timestamps[i].replace("Z", "+00:00"))
+                intervals.append((t2 - t1).total_seconds() * 1000)
+            except (ValueError, TypeError):
+                pass
+        if not intervals:
+            return JSONResponse(content={"cadence_ms": 0, "stable": False, "confidence": 0})
+        avg = sum(intervals) / len(intervals)
+        variance = sum((x - avg) ** 2 for x in intervals) / len(intervals)
+        stability = max(0.0, 1.0 - (variance / (avg ** 2 + 1e-6)))
+        return JSONResponse(content={
+            "cadence_ms": round(avg, 1),
+            "stable": stability > 0.8,
+            "confidence": round(stability, 3),
+            "sample_count": len(intervals),
+        })
+
+    return JSONResponse(content={"error": f"Unknown mcp-async tool: {tool_name}"}, status_code=400)
+
+
+# --- mcp-scoring handlers (population coding) ---
+
+def _handle_scoring_mcp(tool_name: str, arguments: dict) -> JSONResponse:
+    """Handle mcp-scoring tool invocations — wraps L2 cross-modality scoring."""
+    traces = list(_recent_traces)
+    system = arguments.get("system", "")
+
+    if not traces:
+        return JSONResponse(content={"score": 0, "message": "No traces available"})
+
+    all_spans = [span for trace in traces for span in trace.spans]
+    modalities = list({s.modality for s in all_spans if s.modality})
+    modality_count = len(modalities)
+
+    if tool_name == "compute_boost":
+        boost = compute_correlation_boost(modality_count)
+        return JSONResponse(content={
+            "modality_count": modality_count,
+            "modalities": modalities,
+            "boost": boost,
+        })
+
+    if tool_name == "score_system":
+        boost = compute_correlation_boost(modality_count)
+        recent_spikes = list(_spike_signals)
+        system_spikes = [s for s in recent_spikes if s.get("source_system") == system]
+        error_count = sum(1 for s in system_spikes if s.get("spike_type") == "error")
+        total_spans = len(all_spans)
+        intent_carrying = sum(1 for s in all_spans if classify_signal(s) == "INTENT_CARRYING")
+        signal_ratio = intent_carrying / total_spans if total_spans > 0 else 0
+        health_score = max(0.0, min(1.0, (signal_ratio * boost) - (error_count * 0.1)))
+        return JSONResponse(content={
+            "system": system,
+            "health_score": round(health_score, 3),
+            "modality_count": modality_count,
+            "boost": boost,
+            "signal_ratio": round(signal_ratio, 3),
+            "error_spikes": error_count,
+            "total_spans": total_spans,
+        })
+
+    if tool_name == "get_modality_coverage":
+        coverage = {}
+        for mod in modalities:
+            mod_spans = [s for s in all_spans if s.modality == mod]
+            intent_count = sum(1 for s in mod_spans if classify_signal(s) == "INTENT_CARRYING")
+            coverage[mod] = {
+                "span_count": len(mod_spans),
+                "intent_carrying": intent_count,
+                "signal_rate": round(intent_count / len(mod_spans), 4) if mod_spans else 0,
+            }
+        return JSONResponse(content={"modalities": coverage, "total_modalities": modality_count})
+
+    return JSONResponse(content={"error": f"Unknown mcp-scoring tool: {tool_name}"}, status_code=400)
+
+
+# --- mcp-orchestration handlers (sequence coding) ---
+
+def _handle_orchestration_mcp(tool_name: str, arguments: dict) -> JSONResponse:
+    """Handle mcp-orchestration tool invocations — wraps L2 execution planning."""
+    traces = list(_recent_traces)
+    system = arguments.get("system", "")
+
+    if not traces:
+        return JSONResponse(content={"plan": None, "message": "No traces available for planning"})
+
+    # Run the full L2 pipeline: analyze → optimize
+    from ignite_parser.analyzer import analyze
+    analysis = analyze(traces)
+    optimized = optimize(analysis, traces)
+
+    if tool_name == "generate_plan":
+        # Build a plan from optimized findings
+        findings = optimized.merged_findings if hasattr(optimized, "merged_findings") else []
+        plan_steps = []
+        for i, f in enumerate(findings[:20]):  # Cap at 20 steps
+            plan_steps.append({
+                "step": i + 1,
+                "action": f.action if hasattr(f, "action") else "investigate",
+                "target": f.target if hasattr(f, "target") else "",
+                "description": f.description if hasattr(f, "description") else str(f),
+                "priority": f.severity if hasattr(f, "severity") else "medium",
+            })
+        return JSONResponse(content={
+            "plan": {"system": system, "steps": plan_steps, "step_count": len(plan_steps)},
+        })
+
+    if tool_name == "get_execution_order":
+        # Return findings in dependency-sorted order (simplified topological sort)
+        findings = optimized.merged_findings if hasattr(optimized, "merged_findings") else []
+        # Group by severity for ordering: critical → high → medium → low
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        ordered = sorted(
+            [{"description": str(f), "severity": getattr(f, "severity", "medium")} for f in findings[:20]],
+            key=lambda x: severity_order.get(x["severity"], 4),
+        )
+        return JSONResponse(content={"ordered_steps": ordered, "count": len(ordered)})
+
+    if tool_name == "validate_plan":
+        # Basic validation — check for duplicate targets, empty steps
+        findings = optimized.merged_findings if hasattr(optimized, "merged_findings") else []
+        targets = [getattr(f, "target", "") for f in findings]
+        duplicates = [t for t in set(targets) if targets.count(t) > 1 and t]
+        return JSONResponse(content={
+            "valid": len(duplicates) == 0,
+            "step_count": len(findings),
+            "duplicate_targets": duplicates,
+            "warnings": [f"Duplicate target: {d}" for d in duplicates],
+        })
+
+    return JSONResponse(content={"error": f"Unknown mcp-orchestration tool: {tool_name}"}, status_code=400)
