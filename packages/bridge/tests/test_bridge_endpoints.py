@@ -184,6 +184,66 @@ async def test_traces_web_ingestion(app):
 
 
 @pytest.mark.anyio
+async def test_traces_api_ingestion(app):
+    """POST /traces/api auto-wraps API spans into a valid trace envelope."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/traces/api", json={
+            "system": "github",
+            "spans": [
+                {
+                    "target": "https://api.github.com/repos/foo/bar",
+                    "method": "GET",
+                    "status_code": 200,
+                    "request_type": "xmlhttprequest",
+                    "request_intent": "query",
+                    "timestamp": "2026-08-10T09:00:00Z",
+                },
+                {
+                    "target": "https://api.github.com/repos/foo/bar/issues",
+                    "method": "POST",
+                    "status_code": 201,
+                    "request_type": "fetch",
+                    "request_intent": "mutation",
+                    "timestamp": "2026-08-10T09:00:01Z",
+                },
+            ],
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["span_count"] == 2
+        assert data["trace_id"]  # non-empty trace ID
+
+
+@pytest.mark.anyio
+async def test_traces_api_unknown_system(app):
+    """POST /traces/api defaults system to 'unknown' when not provided."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/traces/api", json={
+            "spans": [
+                {
+                    "target": "https://internal.example.com/api/data",
+                    "method": "GET",
+                    "status_code": 200,
+                    "request_type": "fetch",
+                },
+            ],
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["span_count"] == 1
+
+
+@pytest.mark.anyio
+async def test_traces_api_empty_spans(app):
+    """POST /traces/api with empty spans still produces a valid envelope."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/traces/api", json={"spans": []})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["span_count"] == 0
+
+
+@pytest.mark.anyio
 async def test_auth_header_forwarding(app):
     """Verify the bridge reads Authorization header from requests."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

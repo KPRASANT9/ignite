@@ -210,6 +210,65 @@ def _wrap_web_spans(spans: list[dict], system: str = "unknown") -> dict:
     }
 
 
+# --- ApiExt span → trace envelope ---
+
+def _wrap_api_spans(spans: list[dict], system: str = "unknown") -> dict:
+    """Wrap an array of ApiExt-shaped spans (from webRequest API) into a full trace envelope."""
+    trace_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    wrapped_spans = []
+    for i, raw in enumerate(spans):
+        method = raw.get("method", "GET")
+        target = raw.get("target", "")
+        status_code = raw.get("status_code")
+        request_intent = raw.get("request_intent", "query")
+        span_system = raw.get("system", system)
+
+        wrapped_spans.append({
+            "span_id": raw.get("span_id", str(uuid.uuid4())),
+            "trace_id": trace_id,
+            "parent_span_id": raw.get("parent_span_id"),
+            "sequence": i + 1,
+            "kind": raw.get("kind", "api_call"),
+            "started_at": raw.get("timestamp", now),
+            "ended_at": None,
+            "duration_ms": raw.get("duration_ms", 0),
+            "interaction": {
+                "target": target,
+                "method": method,
+                "request": {},
+                "response": {"status_code": status_code} if status_code is not None else {},
+            },
+            "observation": {
+                "what_happened": f"API call: {method} {target} → {status_code or '?'}",
+                "what_learned": f"Captured {request_intent} request to {span_system} via webRequest API",
+                "confidence": "low",
+            },
+            "metadata": {
+                "modality": "api",
+                "request_type": raw.get("request_type", ""),
+                "request_intent": request_intent,
+                "system": span_system,
+            },
+        })
+
+    return {
+        "schema_version": "0.1",
+        "trace_id": trace_id,
+        "agent_id": "webext-bridge",
+        "agent_role": "explorer",
+        "system": system,
+        "session_id": str(uuid.uuid4()),
+        "started_at": now,
+        "status": "completed",
+        "objective": "Capture API observation trace from browser webRequest API",
+        "spans": wrapped_spans,
+        "findings": [],
+        "metadata": {"modality": "api", "kind": "webRequest"},
+    }
+
+
 # --- App factory ---
 
 def create_app() -> FastAPI:
@@ -232,6 +291,16 @@ def create_app() -> FastAPI:
         spans = body.get("spans", body if isinstance(body, list) else [])
         system = body.get("system", "unknown") if isinstance(body, dict) else "unknown"
         envelope = _wrap_web_spans(spans, system=system)
+        resp = ingest_trace(envelope)
+        status = 200 if not resp.errors else 422
+        return JSONResponse(content=_trace_response_dict(resp), status_code=status)
+
+    @app.post("/traces/api")
+    async def post_traces_api(request: Request):
+        body = await request.json()
+        spans = body.get("spans", body if isinstance(body, list) else [])
+        system = body.get("system", "unknown") if isinstance(body, dict) else "unknown"
+        envelope = _wrap_api_spans(spans, system=system)
         resp = ingest_trace(envelope)
         status = 200 if not resp.errors else 422
         return JSONResponse(content=_trace_response_dict(resp), status_code=status)
