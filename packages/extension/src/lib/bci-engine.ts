@@ -15,7 +15,6 @@
 
 import {
   subscribeSpikeStream,
-  ingestTrace,
   ingestApiTrace,
   getSystemCredential,
   type SpikeSignal,
@@ -403,7 +402,12 @@ export class BCIEngine {
   ): Promise<void> {
     const span = createFsmTransitionSpan(systemId, fromState, toState, triggerSpike)
     try {
-      await ingestTrace(span, this.bridgeUrl)
+      // Route through /traces/web auto-wrapper — self-trace spans are web_ext
+      // type and lack the full envelope fields that POST /traces requires.
+      await ingestApiTrace(
+        { spans: [span], source: "self-trace", system: systemId },
+        this.bridgeUrl,
+      )
     } catch {
       // Self-tracing is best-effort
     }

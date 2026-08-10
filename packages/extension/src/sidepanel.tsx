@@ -245,13 +245,28 @@ function SidePanel() {
       return `${errors.length} error signal${errors.length > 1 ? "s" : ""} detected:\n\n${errors.map((e) => `• ${e.description} — Actions: ${e.action_space.join(", ")}`).join("\n")}`
     }
 
+    // Cross-modality queries
+    if (q.includes("modal") || q.includes("cross") || q.includes("correlation")) {
+      const modalities = new Set(context.recentSpikes.flatMap((s) => s.modalities))
+      if (modalities.size >= 2) {
+        return `Cross-modality signals detected across **${[...modalities].join(" + ")}** for ${context.system}. ${modalities.size >= 2 ? "1.5x" : "1.0x"} correlation boost applied${modalities.size >= 3 ? " (2.0x for 3+ modalities)" : ""}. The BCI loop is seeing signals from multiple observation surfaces — this increases spike confidence.`
+      }
+      return `Only **${modalities.size > 0 ? [...modalities].join(", ") : "no"}** modality observed so far. Cross-modality correlation activates when 2+ modalities (web, api, cli, db, msg) contribute signals simultaneously.`
+    }
+
+    // BCI loop queries
+    if (q.includes("bci") || q.includes("loop") || q.includes("pipeline")) {
+      const stateEmoji = { IDLE: "⏸", CONNECTING: "🔌", DISCOVERING: "🔍", PROFILING: "📊", ACTIVE: "✅" }
+      return `BCI loop for ${context.system}:\n\n• **Capture**: ${context.traces} traces (web + api modalities)\n• **Spikes**: ${context.recentSpikes.length} recent signals\n• **FSM**: ${(stateEmoji as any)[context.state] || "❓"} ${context.state} (confidence: ${(context.confidence * 100).toFixed(0)}%)\n• **Actions**: ${context.recentSpikes.flatMap((s) => s.action_space).length} pending action suggestions\n\nThe loop flows: capture → spike detection → FSM evolution → action suggestions → MCP execution.`
+    }
+
     // Help
     if (q.includes("help") || q.includes("what can")) {
-      return `I can help you understand your connected systems through their trace data. Try asking:\n\n• "What's the status of github?"\n• "Show me recent spike signals"\n• "What endpoints are being tracked?"\n• "Are there any errors?"\n\nI'm grounded in real trace data — my answers reflect what the BCI pipeline has actually observed.`
+      return `I can help you understand your connected systems through their trace data. Try asking:\n\n• "What's the status of github?"\n• "Show me recent spike signals"\n• "What endpoints are being tracked?"\n• "Are there any errors?"\n• "Show cross-modality signals"\n• "How is the BCI loop?"\n\nI'm grounded in real trace data — my answers reflect what the BCI pipeline has actually observed.`
     }
 
     // Default
-    return `I can see ${context.system} is in **${context.state}** state with ${context.traces} traces. ${context.recentSpikes.length} recent spike signals. Ask me about status, spikes, endpoints, or errors for trace-grounded insights.`
+    return `I can see ${context.system} is in **${context.state}** state with ${context.traces} traces. ${context.recentSpikes.length} recent spike signals. Ask me about status, spikes, endpoints, errors, cross-modality, or the BCI loop for trace-grounded insights.`
   }
 
   // --- Render ---

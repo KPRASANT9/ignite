@@ -65,6 +65,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
 
+  if (message.type === "SHOW_SIDE_PANEL") {
+    // Escalation actions (escalate_human, log_escalate, alert_human)
+    // open the side panel so the user can see spike context + take action.
+    const tabId = sender.tab?.id
+    if (tabId && chrome.sidePanel) {
+      (chrome.sidePanel as any).open({ tabId }).catch(() => {})
+    }
+    sendResponse({ ok: true })
+  }
+
   // Return true for async response support
   return true
 })

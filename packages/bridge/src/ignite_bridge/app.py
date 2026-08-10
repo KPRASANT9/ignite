@@ -37,6 +37,8 @@ from ignite_parser.optimizer import optimize, ExtractedFSM
 _spike_buffer: deque[dict] = deque(maxlen=200)
 _spike_signals: deque[dict] = deque(maxlen=200)
 _recent_traces: deque[Trace] = deque(maxlen=100)
+_ingestion_count: int = 0
+_CROSS_MODAL_INTERVAL: int = 5  # Run cross-modal correlation every N ingestions
 
 # --- MCP tool registry ---
 # Maps (system, archetype) → list of tool definitions.
@@ -133,6 +135,25 @@ def _trace_response_dict(resp: TraceResponse) -> dict:
 
 # --- Core ingestion ---
 
+def _emit_spikes(spikes: list[SpikeSignal]) -> None:
+    """Serialize spike signals and append to both buffers."""
+    for spike in spikes:
+        spike_dict = {
+            "spike_type": spike.spike_type,
+            "confidence": spike.confidence,
+            "urgency": spike.urgency,
+            "modalities": spike.modalities,
+            "chain": spike.chain,
+            "action_space": spike.action_space,
+            "source_system": spike.source_system,
+            "error_code": spike.error_code,
+            "description": spike.description,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        _spike_signals.append(spike_dict)
+        _spike_buffer.append(spike_dict)
+
+
 def ingest_trace(data: dict[str, Any]) -> TraceResponse:
     """Parse a trace dict, run spike detection, return response."""
     result = parse_trace(data)
@@ -152,24 +173,26 @@ def ingest_trace(data: dict[str, Any]) -> TraceResponse:
     trace = result.traces[0]
     _recent_traces.append(trace)
 
-    # Run the real L2 spike detection pipeline
+    # Run the real L2 spike detection pipeline (per-trace)
     spikes = detect_spikes([trace], system=trace.system)
-    for spike in spikes:
-        spike_dict = {
-            "spike_type": spike.spike_type,
-            "confidence": spike.confidence,
-            "urgency": spike.urgency,
-            "modalities": spike.modalities,
-            "chain": spike.chain,
-            "action_space": spike.action_space,
-            "source_system": spike.source_system,
-            "error_code": spike.error_code,
-            "description": spike.description,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+    _emit_spikes(spikes)
+
+    # Periodically run cross-modality correlation across recent traces.
+    # Per-trace detection misses cross-modal signals because web and API
+    # traces have different trace_ids. This pass correlates spans across
+    # the recent buffer, unlocking the 1.5x/2.0x multi-modal boosts.
+    global _ingestion_count
+    _ingestion_count += 1
+    if _ingestion_count % _CROSS_MODAL_INTERVAL == 0 and len(_recent_traces) >= 2:
+        recent = list(_recent_traces)[-_CROSS_MODAL_INTERVAL:]
+        modalities = {
+            getattr(s, "modality", None)
+            for t in recent for s in t.spans
         }
-        _spike_signals.append(spike_dict)
-        # Also feed the SSE buffer for backwards compat
-        _spike_buffer.append(spike_dict)
+        modalities.discard(None)
+        if len(modalities) >= 2:
+            cross_spikes = detect_spikes(recent, system=trace.system)
+            _emit_spikes(cross_spikes)
 
     return TraceResponse(
         trace_id=trace.trace_id,
