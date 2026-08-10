@@ -46,6 +46,22 @@ export async function ingestTrace(
 }
 
 /**
+ * Send API-modality spans to the L2 pipeline via the auto-wrapping endpoint.
+ * Used by BCIEngine.flushWebRequests() for webRequest-captured network observations.
+ */
+export async function ingestApiTrace(
+  traceData: Record<string, unknown>,
+  bridgeUrl = DEFAULT_BRIDGE_URL,
+): Promise<TraceResponse> {
+  const res = await fetch(`${bridgeUrl}/traces/api`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(traceData),
+  })
+  return (await res.json()) as TraceResponse
+}
+
+/**
  * Check if the L2 bridge service is running.
  */
 export async function checkHealth(

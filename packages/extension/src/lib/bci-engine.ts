@@ -16,6 +16,7 @@
 import {
   subscribeSpikeStream,
   ingestTrace,
+  ingestApiTrace,
   getSystemCredential,
   type SpikeSignal,
 } from "./bridge-client"
@@ -316,14 +317,13 @@ export class BCIEngine {
 
     const batch = this.webRequestBuffer.splice(0)
     const spans = batch
-      .filter((c) => c.system !== null) // Only send for known systems
       .map((c) => ({
         type: "api_ext",
         target: c.url,
         method: c.method,
         status_code: c.statusCode,
         request_type: c.type,
-        system: c.system,
+        system: c.system ?? "unknown",
         timestamp: c.timestamp,
         modality: "api",
         request_intent: this.classifyRequestIntent(c.method),
@@ -332,7 +332,7 @@ export class BCIEngine {
     if (spans.length === 0) return
 
     try {
-      await ingestTrace(
+      await ingestApiTrace(
         { spans, source: "webRequest", batch: true },
         this.bridgeUrl,
       )
