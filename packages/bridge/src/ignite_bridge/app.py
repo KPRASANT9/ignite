@@ -30,6 +30,7 @@ from ignite_parser.models import Trace
 from ignite_parser.parser import parse_trace
 from ignite_parser.spike import SpikeSignal, detect_spikes, correlate_spans, compute_correlation_boost, classify_signal
 from ignite_parser.optimizer import optimize, ExtractedFSM
+from ignite_parser.loop_detector import detect_loops
 
 
 # --- In-memory state ---
@@ -402,6 +403,64 @@ def create_app() -> FastAPI:
         """Return recent spike signals as JSON (not SSE)."""
         spikes = list(_spike_signals)[-limit:]
         return JSONResponse(content={"spikes": spikes, "count": len(spikes)})
+
+    @app.get("/traces/loops")
+    async def get_traces_loops():
+        """Detect cross-modality BCI loops across recent traces."""
+        traces = list(_recent_traces)
+        if not traces:
+            return JSONResponse(content={
+                "total_loops": 0, "complete_loops": 0,
+                "total_edges": 0, "modalities": [], "loops": [],
+            })
+        result = detect_loops(traces)
+        return JSONResponse(content=result.summary())
+
+    @app.get("/confidence")
+    async def get_confidence():
+        """Per-system, per-modality confidence breakdown."""
+        traces = list(_recent_traces)
+        if not traces:
+            return JSONResponse(content={"systems": {}, "total_traces": 0})
+
+        # Group spans by system and modality
+        systems: dict[str, dict] = {}
+        for trace in traces:
+            sys_name = trace.system or "unknown"
+            if sys_name not in systems:
+                systems[sys_name] = {"traces": 0, "modalities": {}, "span_count": 0}
+            systems[sys_name]["traces"] += 1
+            for span in trace.spans:
+                mod = span.modality.value if span.modality else "unknown"
+                if mod not in systems[sys_name]["modalities"]:
+                    systems[sys_name]["modalities"][mod] = {
+                        "span_count": 0, "intent_carrying": 0,
+                    }
+                systems[sys_name]["modalities"][mod]["span_count"] += 1
+                systems[sys_name]["span_count"] += 1
+                if classify_signal(span) == "INTENT_CARRYING":
+                    systems[sys_name]["modalities"][mod]["intent_carrying"] += 1
+
+        # Compute signal rates
+        for sys_data in systems.values():
+            for mod_data in sys_data["modalities"].values():
+                total = mod_data["span_count"]
+                mod_data["signal_rate"] = round(
+                    mod_data["intent_carrying"] / total, 4
+                ) if total > 0 else 0
+
+        # Add spike counts per system
+        recent_spikes = list(_spike_signals)
+        for sys_name, sys_data in systems.items():
+            sys_spikes = [s for s in recent_spikes if s.get("source_system") == sys_name]
+            sys_data["spike_count"] = len(sys_spikes)
+            sys_data["error_spikes"] = sum(1 for s in sys_spikes if s.get("spike_type") == "error")
+
+        return JSONResponse(content={
+            "systems": systems,
+            "total_traces": len(traces),
+            "total_systems": len(systems),
+        })
 
     # --- MCP routing ---
 

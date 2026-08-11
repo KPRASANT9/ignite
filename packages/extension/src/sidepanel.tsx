@@ -54,9 +54,11 @@ function SidePanel() {
   // System context
   const [systemContext, setSystemContext] = useState<SystemContext | null>(null)
   const [endpoints, setEndpoints] = useState<EndpointInfo[]>([])
+  const [loopData, setLoopData] = useState<any>(null)
+  const [confidenceData, setConfidenceData] = useState<any>(null)
 
   // View mode
-  const [activeTab, setActiveTab] = useState<"spikes" | "chat">("spikes")
+  const [activeTab, setActiveTab] = useState<"spikes" | "chat" | "dashboard">("spikes")
 
   // --- Bridge URL ---
   useEffect(() => {
@@ -107,6 +109,23 @@ function SidePanel() {
       })
       .catch(() => {})
   }, [bridgeUrl, systemContext])
+
+  // --- Fetch loop detection + confidence dashboard ---
+  useEffect(() => {
+    const fetchDashboard = () => {
+      fetch(`${bridgeUrl}/traces/loops`)
+        .then((res) => res.json())
+        .then(setLoopData)
+        .catch(() => {})
+      fetch(`${bridgeUrl}/confidence`)
+        .then((res) => res.json())
+        .then(setConfidenceData)
+        .catch(() => {})
+    }
+    fetchDashboard()
+    const interval = setInterval(fetchDashboard, 10000)
+    return () => clearInterval(interval)
+  }, [bridgeUrl])
 
   // --- SSE spike stream ---
   useEffect(() => {
@@ -204,6 +223,8 @@ function SidePanel() {
       modalities: [...allModalities],
       pendingActions: actionCounts,
       spikeHistory: recent,
+      loops: loopData,
+      confidenceDashboard: confidenceData,
     }
   }
 
@@ -284,19 +305,40 @@ function SidePanel() {
       return `Only **${modalities.size > 0 ? [...modalities].join(", ") : "no"}** modality observed so far. Cross-modality correlation activates when 2+ modalities (web, api, cli, db, msg) contribute signals simultaneously.`
     }
 
-    // BCI loop queries
-    if (q.includes("bci") || q.includes("loop") || q.includes("pipeline")) {
+    // BCI loop queries — now uses real loop detector data
+    if (q.includes("bci") || q.includes("loop") || q.includes("pipeline") || q.includes("cycle")) {
       const stateEmoji = { IDLE: "⏸", CONNECTING: "🔌", DISCOVERING: "🔍", PROFILING: "📊", ACTIVE: "✅" }
-      return `BCI loop for ${context.system}:\n\n• **Capture**: ${context.traces} traces (web + api modalities)\n• **Spikes**: ${context.recentSpikes.length} recent signals\n• **FSM**: ${(stateEmoji as any)[context.state] || "❓"} ${context.state} (confidence: ${(context.confidence * 100).toFixed(0)}%)\n• **Actions**: ${context.recentSpikes.flatMap((s) => s.action_space).length} pending action suggestions\n\nThe loop flows: capture → spike detection → FSM evolution → action suggestions → MCP execution.`
+      const loops = context.loops
+      let loopStatus = "No complete BCI loops detected yet."
+      if (loops?.complete_loops > 0) {
+        const details = loops.loops.filter((l: any) => l.is_complete).map((l: any) => l.stages?.join(" → ")).join("; ")
+        loopStatus = `**${loops.complete_loops} complete BCI loop(s)** detected: ${details}`
+      } else if (loops?.total_loops > 0) {
+        loopStatus = `${loops.total_loops} partial loop(s) — cross-modal edges accumulating (${loops.total_edges} edges across ${loops.modalities?.join(", ")})`
+      }
+      return `BCI loop for ${context.system}:\n\n• **Capture**: ${context.traces} traces (${context.modalities.join(" + ") || "no modalities"})\n• **Spikes**: ${context.recentSpikes.length} recent signals\n• **FSM**: ${(stateEmoji as any)[context.state] || "❓"} ${context.state} (${(context.confidence * 100).toFixed(0)}%)\n• **Loop Detection**: ${loopStatus}\n• **Actions**: ${Object.keys(context.pendingActions).length} types pending\n\ncapture → spike → FSM → action → feedback → capture`
+    }
+
+    // Confidence/dashboard queries
+    if (q.includes("confidence") || q.includes("dashboard") || q.includes("health")) {
+      const dash = context.confidenceDashboard
+      if (!dash?.systems || Object.keys(dash.systems).length === 0) {
+        return "No system data available yet. Navigate to a connected system to begin."
+      }
+      const lines = Object.entries(dash.systems).map(([name, data]: [string, any]) => {
+        const mods = Object.entries(data.modalities || {}).map(([m, d]: [string, any]) => `${m} (${d.span_count} spans, ${(d.signal_rate * 100).toFixed(0)}% signal)`).join(", ")
+        return `• **${name}**: ${data.traces} traces, ${data.spike_count || 0} spikes${data.error_spikes > 0 ? ` (${data.error_spikes} errors)` : ""} — modalities: ${mods || "none"}`
+      })
+      return `**System Confidence Dashboard**\n\n${lines.join("\n")}\n\n${dash.total_traces} total traces across ${dash.total_systems} systems.`
     }
 
     // Help
     if (q.includes("help") || q.includes("what can")) {
-      return `I can help you understand your connected systems through their trace data. Try asking:\n\n• "What's the status of github?"\n• "Show me recent spike signals"\n• "What endpoints are being tracked?"\n• "Are there any errors?"\n• "Show cross-modality signals"\n• "How is the BCI loop?"\n\nI'm grounded in real trace data — my answers reflect what the BCI pipeline has actually observed.`
+      return `I can help you understand your connected systems through their trace data. Try asking:\n\n• "What's the status?"\n• "Show me recent spikes"\n• "What endpoints are tracked?"\n• "Any errors?"\n• "Show cross-modality signals"\n• "How is the BCI loop?"\n• "Show confidence dashboard"\n• "What actions should I take?"\n• "Give me a summary"\n\nI'm grounded in real trace data — my answers reflect what the BCI pipeline has actually observed.`
     }
 
     // Default
-    return `I can see ${context.system} is in **${context.state}** state with ${context.traces} traces. ${context.recentSpikes.length} recent spike signals. Ask me about status, spikes, endpoints, errors, cross-modality, or the BCI loop for trace-grounded insights.`
+    return `I can see ${context.system} is in **${context.state}** state with ${context.traces} traces. ${context.recentSpikes.length} recent spike signals. Ask me about status, spikes, endpoints, errors, cross-modality, BCI loops, confidence, actions, or a summary.`
   }
 
   // --- Render ---
@@ -366,6 +408,22 @@ function SidePanel() {
           }}
         >
           Chat
+        </button>
+        <button
+          onClick={() => setActiveTab("dashboard")}
+          style={{
+            flex: 1,
+            padding: "8px 0",
+            border: "none",
+            borderBottom: activeTab === "dashboard" ? "2px solid #1976d2" : "2px solid transparent",
+            background: "none",
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: activeTab === "dashboard" ? 600 : 400,
+            color: activeTab === "dashboard" ? "#1976d2" : "#666",
+          }}
+        >
+          Dashboard
         </button>
       </div>
 
@@ -487,6 +545,83 @@ function SidePanel() {
                 <div style={{ fontSize: 11, color: "#999", padding: "4px 0" }}>Thinking...</div>
               )}
               <div ref={chatEndRef} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "dashboard" && (
+          <div>
+            {/* Confidence per system */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>System Confidence</div>
+              {confidenceData?.systems && Object.keys(confidenceData.systems).length > 0 ? (
+                Object.entries(confidenceData.systems).map(([sysName, sysData]: [string, any]) => (
+                  <div key={sysName} style={{
+                    padding: "6px 8px", marginBottom: 4, borderRadius: 4,
+                    background: "#f5f5f5", fontSize: 11,
+                  }}>
+                    <div style={{ fontWeight: 600 }}>{sysName}</div>
+                    <div style={{ color: "#666", marginTop: 2 }}>
+                      {sysData.traces} traces, {sysData.span_count} spans, {sysData.spike_count || 0} spikes
+                      {sysData.error_spikes > 0 && <span style={{ color: "#c62828" }}> ({sysData.error_spikes} errors)</span>}
+                    </div>
+                    <div style={{ marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {Object.entries(sysData.modalities || {}).map(([mod, modData]: [string, any]) => (
+                        <span key={mod} style={{
+                          padding: "1px 6px", borderRadius: 3, fontSize: 10,
+                          background: modData.signal_rate > 0.5 ? "#c8e6c9" : modData.signal_rate > 0.1 ? "#fff3e0" : "#f5f5f5",
+                          border: "1px solid #e0e0e0",
+                        }}>
+                          {mod}: {modData.span_count} spans ({(modData.signal_rate * 100).toFixed(0)}% signal)
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p style={{ color: "#888", fontSize: 11 }}>No system data yet.</p>
+              )}
+            </div>
+
+            {/* BCI Loop Detection */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>BCI Loop Detection</div>
+              {loopData ? (
+                <div style={{ fontSize: 11 }}>
+                  <div style={{ color: "#666", marginBottom: 4 }}>
+                    {loopData.total_edges} cross-modality edges, {loopData.modalities?.length || 0} modalities observed
+                  </div>
+                  {loopData.complete_loops > 0 ? (
+                    <div style={{
+                      padding: "6px 8px", borderRadius: 4,
+                      background: "#c8e6c9", border: "1px solid #a5d6a7",
+                    }}>
+                      {loopData.complete_loops} complete BCI loop{loopData.complete_loops > 1 ? "s" : ""} detected!
+                      {loopData.loops?.filter((l: any) => l.is_complete).map((loop: any, i: number) => (
+                        <div key={i} style={{ fontSize: 10, color: "#2e7d32", marginTop: 2 }}>
+                          {loop.stages?.join(" → ")} ({loop.modalities?.join(", ")})
+                        </div>
+                      ))}
+                    </div>
+                  ) : loopData.total_loops > 0 ? (
+                    <div style={{
+                      padding: "6px 8px", borderRadius: 4,
+                      background: "#fff3e0", border: "1px solid #ffe0b2",
+                    }}>
+                      {loopData.total_loops} partial loop{loopData.total_loops > 1 ? "s" : ""} — accumulating cross-modal signal
+                    </div>
+                  ) : (
+                    <div style={{ color: "#888" }}>No loops yet. Capture more cross-modality traces.</div>
+                  )}
+                </div>
+              ) : (
+                <p style={{ color: "#888", fontSize: 11 }}>Loading loop detection...</p>
+              )}
+            </div>
+
+            {/* Summary stats */}
+            <div style={{ fontSize: 10, color: "#999", borderTop: "1px solid #e0e0e0", paddingTop: 8 }}>
+              {confidenceData?.total_traces || 0} traces across {confidenceData?.total_systems || 0} systems
             </div>
           </div>
         )}

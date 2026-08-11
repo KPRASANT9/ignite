@@ -276,6 +276,40 @@ async def test_mcp_ratelimit_check_budget(app):
 
 
 @pytest.mark.anyio
+async def test_traces_loops_empty(app):
+    """GET /traces/loops with no traces returns empty result."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/traces/loops")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_loops"] == 0
+        assert data["complete_loops"] == 0
+
+
+@pytest.mark.anyio
+async def test_confidence_empty(app):
+    """GET /confidence with no traces returns empty result."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/confidence")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_traces"] == 0
+        assert data["systems"] == {}
+
+
+@pytest.mark.anyio
+async def test_confidence_after_ingestion(app, valid_trace):
+    """GET /confidence returns per-system breakdown after trace ingestion."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await client.post("/traces", json=valid_trace)
+        resp = await client.get("/confidence")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_traces"] > 0
+        assert len(data["systems"]) > 0
+
+
+@pytest.mark.anyio
 async def test_auth_header_forwarding(app):
     """Verify the bridge reads Authorization header from requests."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

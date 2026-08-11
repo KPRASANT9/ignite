@@ -49,7 +49,7 @@ interface WebRequestCapture {
   type: string
   tabId: number
   timestamp: string
-  system: string | null
+  system: string
 }
 
 // --- BCIEngine Class ---
@@ -61,6 +61,7 @@ export class BCIEngine {
   private spikeHandlers: SpikeHandler[] = []
   private webRequestBuffer: WebRequestCapture[] = []
   private readonly WEB_REQUEST_BUFFER_SIZE = 100
+  private customSystemPatterns: Array<{ pattern: string; system: string }> = []
 
   constructor(config: BCIEngineConfig) {
     this.bridgeUrl = config.bridgeUrl
@@ -80,6 +81,12 @@ export class BCIEngine {
       restoreConfidenceStates(
         stored.confidenceStates as Record<string, SerializedConfidenceState>,
       )
+    }
+
+    // Load custom system URL patterns from config
+    const config = await chrome.storage.sync.get("systemPatterns")
+    if (Array.isArray(config.systemPatterns)) {
+      this.customSystemPatterns = config.systemPatterns
     }
 
     this.streamActive = true
@@ -322,7 +329,7 @@ export class BCIEngine {
         method: c.method,
         status_code: c.statusCode,
         request_type: c.type,
-        system: c.system ?? "unknown",
+        system: c.system,
         timestamp: c.timestamp,
         modality: "api",
         request_intent: this.classifyRequestIntent(c.method),
@@ -374,13 +381,19 @@ export class BCIEngine {
 
   // --- Helpers ---
 
-  private inferSystemFromUrl(url: string): string | null {
+  private inferSystemFromUrl(url: string): string {
+    // Check user-configured custom patterns first
+    for (const entry of this.customSystemPatterns) {
+      if (url.includes(entry.pattern)) return entry.system
+    }
+    // Built-in patterns
     if (url.includes("github.com") || url.includes("api.github.com")) return "github"
     if (url.includes("atlassian.net") || url.includes("jira.")) return "jira"
     if (url.includes("databricks.com") || url.includes("azuredatabricks.net")) return "databricks"
     if (url.includes("console.aws.amazon.com") || url.includes("amazonaws.com")) return "aws-console"
     if (url.includes("gitlab.com") || url.includes("gitlab.")) return "gitlab"
-    return null
+    // Unknown systems still get captured — universality principle
+    return "unknown"
   }
 
   private classifyRequestIntent(method: string): string {
