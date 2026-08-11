@@ -61,6 +61,11 @@ _mcp_tools: dict[tuple[str, str], list[dict]] = {
         {"name": "score_system", "description": "Score overall system health", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
         {"name": "get_modality_coverage", "description": "List observed modalities and signal rates", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
     ],
+    ("*", "mcp-ratelimit"): [
+        {"name": "calculate_backoff", "description": "Calculate exponential backoff delay for rate-limited requests", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}, "attempt": {"type": "number"}}, "required": ["system"]}},
+        {"name": "check_budget", "description": "Check remaining request budget in current window", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+        {"name": "get_rate_status", "description": "Get rate limiting status and recent throttle events", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
+    ],
     ("*", "mcp-orchestration"): [
         {"name": "generate_plan", "description": "Generate execution plan from traces", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}, "objective": {"type": "string"}}, "required": ["system"]}},
         {"name": "get_execution_order", "description": "Get topologically-sorted execution order", "inputSchema": {"type": "object", "properties": {"system": {"type": "string"}}, "required": ["system"]}},
@@ -449,6 +454,8 @@ def create_app() -> FastAPI:
             return _handle_async_mcp(tool_name, arguments)
         if archetype_lower == "mcp-scoring":
             return _handle_scoring_mcp(tool_name, arguments)
+        if archetype_lower == "mcp-ratelimit":
+            return _handle_ratelimit_mcp(tool_name, arguments)
         if archetype_lower == "mcp-orchestration":
             return _handle_orchestration_mcp(tool_name, arguments)
 
@@ -712,6 +719,70 @@ def _handle_scoring_mcp(tool_name: str, arguments: dict) -> JSONResponse:
         return JSONResponse(content={"modalities": coverage, "total_modalities": modality_count})
 
     return JSONResponse(content={"error": f"Unknown mcp-scoring tool: {tool_name}"}, status_code=400)
+
+
+# --- mcp-ratelimit handlers (feedback coding) ---
+
+# In-memory rate tracking per system. In production this would be Redis-backed.
+_rate_state: dict[str, dict] = {}
+
+
+def _handle_ratelimit_mcp(tool_name: str, arguments: dict) -> JSONResponse:
+    """Handle mcp-ratelimit tool invocations — rate limit tracking and backoff."""
+    system = arguments.get("system", "")
+
+    if tool_name == "calculate_backoff":
+        attempt = int(arguments.get("attempt", 1))
+        # Exponential backoff: base_ms * 2^(attempt-1), capped at 60s
+        base_ms = 1000
+        delay_ms = min(base_ms * (2 ** (attempt - 1)), 60000)
+        return JSONResponse(content={
+            "system": system,
+            "attempt": attempt,
+            "delay_ms": delay_ms,
+            "delay_s": round(delay_ms / 1000, 1),
+            "strategy": "exponential_backoff",
+        })
+
+    if tool_name == "check_budget":
+        # Check recent traces for rate-limit signals
+        recent_spikes = list(_spike_signals)
+        system_ratelimit_spikes = [
+            s for s in recent_spikes
+            if s.get("source_system") == system and s.get("spike_type") == "health_shift"
+        ]
+        state = _rate_state.get(system, {"calls": 0, "throttled": 0})
+        window_seconds = 60
+        return JSONResponse(content={
+            "system": system,
+            "window_seconds": window_seconds,
+            "throttle_events": len(system_ratelimit_spikes),
+            "calls_tracked": state.get("calls", 0),
+            "status": "throttled" if len(system_ratelimit_spikes) > 0 else "ok",
+        })
+
+    if tool_name == "get_rate_status":
+        recent_spikes = list(_spike_signals)
+        throttle_spikes = [
+            s for s in recent_spikes
+            if s.get("source_system") == system
+            and s.get("spike_type") in ("health_shift", "error")
+        ]
+        return JSONResponse(content={
+            "system": system,
+            "recent_throttle_events": len(throttle_spikes),
+            "events": [
+                {
+                    "type": s.get("spike_type"),
+                    "confidence": s.get("confidence"),
+                    "timestamp": s.get("timestamp"),
+                    "description": s.get("description"),
+                }
+                for s in throttle_spikes[-5:]
+            ],
+        })
+
+    return JSONResponse(content={"error": f"Unknown mcp-ratelimit tool: {tool_name}"}, status_code=400)
 
 
 # --- mcp-orchestration handlers (sequence coding) ---

@@ -244,6 +244,38 @@ async def test_traces_api_empty_spans(app):
 
 
 @pytest.mark.anyio
+async def test_mcp_ratelimit_calculate_backoff(app):
+    """mcp-ratelimit calculate_backoff returns exponential delay."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/mcp/tools/call", json={
+            "system": "github",
+            "archetype": "mcp-ratelimit",
+            "tool": "calculate_backoff",
+            "arguments": {"system": "github", "attempt": 3},
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["delay_ms"] == 4000  # 1000 * 2^(3-1)
+        assert data["strategy"] == "exponential_backoff"
+
+
+@pytest.mark.anyio
+async def test_mcp_ratelimit_check_budget(app):
+    """mcp-ratelimit check_budget returns budget status."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post("/mcp/tools/call", json={
+            "system": "github",
+            "archetype": "mcp-ratelimit",
+            "tool": "check_budget",
+            "arguments": {"system": "github"},
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert "window_seconds" in data
+
+
+@pytest.mark.anyio
 async def test_auth_header_forwarding(app):
     """Verify the bridge reads Authorization header from requests."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

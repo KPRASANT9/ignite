@@ -186,14 +186,24 @@ function SidePanel() {
 
   // --- Build trace context for grounded responses ---
   function buildTraceContext() {
+    const recent = spikes.slice(0, 10)
+    const allModalities = new Set(recent.flatMap((s) => s.modalities))
+    const allActions = recent.flatMap((s) => s.action_space)
+    const actionCounts: Record<string, number> = {}
+    for (const a of allActions) {
+      actionCounts[a] = (actionCounts[a] || 0) + 1
+    }
     return {
       system: systemContext?.id || "unknown",
       state: systemContext?.state || "IDLE",
       traces: systemContext?.traces || 0,
       confidence: systemContext?.confidence || 0,
-      recentSpikes: spikes.slice(0, 5),
-      recentSpikeTypes: spikes.slice(0, 5).map((s) => s.spike_type),
+      recentSpikes: recent.slice(0, 5),
+      recentSpikeTypes: recent.slice(0, 5).map((s) => s.spike_type),
       endpoints: endpoints.slice(0, 5),
+      modalities: [...allModalities],
+      pendingActions: actionCounts,
+      spikeHistory: recent,
     }
   }
 
@@ -234,6 +244,26 @@ function SidePanel() {
         .map((e) => `• \`${e.method} ${e.endpoint}\` — ${e.count} calls, avg ${e.latency_avg_ms}ms`)
         .join("\n")
       return `Tracked endpoints for ${context.system}:\n\n${summary}`
+    }
+
+    // Action queries
+    if (q.includes("action") || q.includes("do") || q.includes("suggest") || q.includes("recommend")) {
+      const actions = Object.entries(context.pendingActions)
+      if (actions.length === 0) {
+        return "No pending actions. The system is stable."
+      }
+      const summary = actions
+        .sort((a, b) => b[1] - a[1])
+        .map(([action, count]) => `• **${action}** (${count}x)`)
+        .join("\n")
+      return `Suggested actions from recent spikes:\n\n${summary}\n\nClick the action buttons on spike cards in the Signals tab to execute.`
+    }
+
+    // Summary/overview queries
+    if (q.includes("summary") || q.includes("overview") || q.includes("report")) {
+      const errorCount = context.spikeHistory.filter((s) => s.spike_type === "error").length
+      const patternCount = context.spikeHistory.filter((s) => s.spike_type === "pattern").length
+      return `**${context.system} Summary**\n\n• State: **${context.state}** (${(context.confidence * 100).toFixed(0)}% confidence)\n• Traces: ${context.traces} captured\n• Modalities: ${context.modalities.length > 0 ? context.modalities.join(", ") : "none yet"}\n• Recent signals: ${context.spikeHistory.length} (${errorCount} errors, ${patternCount} patterns)\n• Endpoints tracked: ${context.endpoints.length}\n• Pending actions: ${Object.keys(context.pendingActions).length} types`
     }
 
     // Error/issue queries
